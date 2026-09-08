@@ -1,4 +1,4 @@
-# Family Finance Dashboard
+# Nest Ledger
 
 Self-hosted household finance system for a two-spouse homelab (Proxmox LXC + Docker Compose).
 
