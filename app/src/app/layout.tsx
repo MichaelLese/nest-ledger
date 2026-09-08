@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Family Finance",
+  title: "Nest Ledger",
   description: "Household finance dashboard",
 };
 
