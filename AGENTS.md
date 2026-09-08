@@ -6,7 +6,7 @@ Build principle: **Actual Budget is the financial ledger.** The custom app only 
 ownership, responsibility, reconciliation, and simplified visualization.
 
 ## References
-- `docs/family_finance_dashboard_proxmox_build_plan.pdf` — authoritative build plan (16 sections):
+- `docs/doc_bd8b06650f63_family_finance_dashboard_proxmox_build_plan.pdf` — authoritative build plan (16 sections):
   architecture (SimpleFIN → Actual Budget → custom app → PostgreSQL), LXC sizing
   (2 vCPU / 2 GB RAM / 24-32 GB disk, Debian 13 unprivileged + nesting), data model
   (household_members, transaction_metadata, bills, split_rules, household_settings),

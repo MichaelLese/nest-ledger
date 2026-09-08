@@ -1,0 +1,12 @@
+{
+  "name": "family-finance-dashboard",
+  "private": true,
+  "workspaces": ["app"],
+  "scripts": {
+    "dev": "npm run dev --workspace app",
+    "typecheck": "npm run typecheck --workspace app",
+    "build": "npm run build --workspace app",
+    "test": "npm run typecheck"
+  },
+  "engines": { "node": ">=22" }
+}
