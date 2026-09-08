@@ -2,10 +2,11 @@
 
 This is the initial infrastructure skeleton, based on sections 3, 12–14 of
 [the build plan](doc_bd8b06650f63_family_finance_dashboard_proxmox_build_plan.pdf).
-Actual remains the ledger. The single Next.js web/API service currently serves
-only a hello page and `/api/health`; its database and Actual environment wiring
-is reserved for later phases. There is no authentication, schema, synchronization,
-or household logic yet. The health endpoint checks process liveness only.
+Actual remains the ledger. The single Next.js web/API service serves a hello
+page, `/api/health`, and a read-only `/api/actual/summary` endpoint. See
+[Actual integration](actual-integration.md) for credentials, API smoke testing,
+and the household metadata SQL migration. Authentication and household workflows
+are not implemented yet. The health endpoint checks process liveness only.
 
 ## Prepare the LXC
 
@@ -16,7 +17,7 @@ address. If builds run out of memory, temporarily use 3–4 GB RAM or 2 GB swap.
 Inside the LXC, install Docker Engine and the Compose plugin using Docker's
 [Debian installation instructions](https://docs.docker.com/engine/install/debian/).
 Verify `docker version` and `docker compose version`. Copy this repository into
-`/opt/nest-ledger` (there is no GitHub remote yet). Commands below
+`/opt/nest-ledger`. Commands below
 run from that directory, with Docker permissions or `sudo`.
 
 ## Configure and start

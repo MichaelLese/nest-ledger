@@ -13,6 +13,8 @@ ownership, responsibility, reconciliation, and simplified visualization.
   bills manager, dashboard UX, joint reconciliation math, review queue, auth, security,
   backup policy, tech stack, and 8 implementation phases.
 
+- `docs/actual-integration.md` — Actual API connection, protected environment, read-only endpoint, and household metadata migration.
+
 ## Core design rules
 - One shared household Actual budget; account ownership ≠ transaction ownership.
 - Track "who owns the expense" (ME / WIFE / JOINT) separately from "who paid it".

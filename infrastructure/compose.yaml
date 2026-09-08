@@ -21,6 +21,9 @@ services:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
       ACTUAL_SERVER_URL: http://actual-server:5006
+      ACTUAL_SERVER_PASSWORD: ${ACTUAL_SERVER_PASSWORD:-}
+      ACTUAL_SYNC_ID: ${ACTUAL_SYNC_ID:-}
+      ACTUAL_BUDGET_PASSWORD: ${ACTUAL_BUDGET_PASSWORD:-}
       PGHOST: postgres
       PGPORT: "5432"
       PGDATABASE: ${POSTGRES_DB:-nest_ledger}

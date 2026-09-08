@@ -14,6 +14,9 @@ WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 COPY --from=build --chown=node:node /app/app/.next/standalone ./
 COPY --from=build --chown=node:node /app/app/.next/static ./app/.next/static
+# The isolated SDK child loads native/runtime assets outside Next's module graph.
+COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/app/scripts ./app/scripts
 USER node
 EXPOSE 3000
 CMD ["node", "app/server.js"]
