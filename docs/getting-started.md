@@ -9,14 +9,14 @@ or household logic yet. The health endpoint checks process liveness only.
 
 ## Prepare the LXC
 
-Create a Debian 13 **unprivileged** LXC named `family-finance`, enable nesting,
+Create a Debian 13 **unprivileged** LXC named `nest-ledger`, enable nesting,
 and allocate 2 vCPU, 2 GB RAM, 1 GB swap and 24–32 GB disk. Assign a stable LAN
 address. If builds run out of memory, temporarily use 3–4 GB RAM or 2 GB swap.
 
 Inside the LXC, install Docker Engine and the Compose plugin using Docker's
 [Debian installation instructions](https://docs.docker.com/engine/install/debian/).
 Verify `docker version` and `docker compose version`. Copy this repository into
-`/opt/family-finance-dashboard` (there is no GitHub remote yet). Commands below
+`/opt/nest-ledger` (there is no GitHub remote yet). Commands below
 run from that directory, with Docker permissions or `sudo`.
 
 ## Configure and start
@@ -33,8 +33,8 @@ curl --fail http://127.0.0.1:3000/api/health
 ```
 
 The build installs locked npm dependencies; the LXC needs registry access.
-Actual persists `/data` in `family-finance_actual-data`; PostgreSQL 17 persists
-its data in `family-finance_postgres-data`. PostgreSQL has no published port and
+Actual persists `/data` in `nest-ledger_actual-data`; PostgreSQL 17 persists
+its data in `nest-ledger_postgres-data`. PostgreSQL has no published port and
 uses a private internal network. Changing the password variable after database
 initialization does not change the database role password.
 

@@ -1,4 +1,4 @@
-name: family-finance
+name: nest-ledger
 
 services:
   actual-server:
@@ -11,7 +11,7 @@ services:
     networks: [application]
 
   # One Node/TypeScript process serves both Next.js pages and API routes.
-  family-finance-web:
+  nest-ledger-web:
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile
@@ -23,8 +23,8 @@ services:
       ACTUAL_SERVER_URL: http://actual-server:5006
       PGHOST: postgres
       PGPORT: "5432"
-      PGDATABASE: ${POSTGRES_DB:-family_finance}
-      PGUSER: ${POSTGRES_USER:-family_finance}
+      PGDATABASE: ${POSTGRES_DB:-nest_ledger}
+      PGUSER: ${POSTGRES_USER:-nest_ledger}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in infrastructure/.env}
     depends_on:
       postgres:
@@ -43,8 +43,8 @@ services:
     image: postgres:17-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-family_finance}
-      POSTGRES_USER: ${POSTGRES_USER:-family_finance}
+      POSTGRES_DB: ${POSTGRES_DB:-nest_ledger}
+      POSTGRES_USER: ${POSTGRES_USER:-nest_ledger}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in infrastructure/.env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
