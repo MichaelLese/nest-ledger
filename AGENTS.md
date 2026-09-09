@@ -1,4 +1,4 @@
-# Family Finance Dashboard
+# Nest Ledger
 
 Self-hosted household finance system for a two-spouse homelab (Proxmox LXC + Docker Compose).
 
@@ -6,12 +6,14 @@ Build principle: **Actual Budget is the financial ledger.** The custom app only 
 ownership, responsibility, reconciliation, and simplified visualization.
 
 ## References
-- `docs/family_finance_dashboard_proxmox_build_plan.pdf` — authoritative build plan (16 sections):
+- `docs/doc_bd8b06650f63_family_finance_dashboard_proxmox_build_plan.pdf` — authoritative build plan (16 sections):
   architecture (SimpleFIN → Actual Budget → custom app → PostgreSQL), LXC sizing
   (2 vCPU / 2 GB RAM / 24-32 GB disk, Debian 13 unprivileged + nesting), data model
   (household_members, transaction_metadata, bills, split_rules, household_settings),
   bills manager, dashboard UX, joint reconciliation math, review queue, auth, security,
   backup policy, tech stack, and 8 implementation phases.
+
+- `docs/actual-integration.md` — Actual API connection, protected environment, read-only endpoint, and household metadata migration.
 
 ## Core design rules
 - One shared household Actual budget; account ownership ≠ transaction ownership.
