@@ -1,0 +1,22 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, rotom/116-phase1-deploy]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:actual
+      - run: npm run build
+      - run: docker compose --env-file infrastructure/.env.example -f infrastructure/compose.yaml config --quiet
+      - run: bash -n infrastructure/backup-agent-hub.sh
