@@ -2,11 +2,11 @@
 
 This is the initial infrastructure skeleton, based on sections 3, 12–14 of
 [the build plan](doc_bd8b06650f63_family_finance_dashboard_proxmox_build_plan.pdf).
-Actual remains the ledger. The single Next.js web/API service serves a hello
+Actual remains the ledger. The single Next.js web/API service serves the ownership review
 page, `/api/health`, and a read-only `/api/actual/summary` endpoint. See
 [Actual integration](actual-integration.md) for credentials, API smoke testing,
-and the household metadata SQL migration. Authentication and household workflows
-are not implemented yet. The health endpoint checks process liveness only.
+and the household metadata SQL migration. Phase 4 adds [ownership review and member login](ownership.md); its new auth
+environment variables must be supplied before deployment. The health endpoint checks process liveness only.
 
 The live CT 116 deployment, private HTTPS URLs, backup automation and restore
 procedure are recorded in [Deployment and recovery](deployment.md).
@@ -55,8 +55,8 @@ Use HTTPS browser URLs; plain HTTP loopback above is only an operational probe.
 See [Actual's Docker guide](https://actualbudget.org/docs/install/docker/).
 
 Keep access private to the household LAN/VPN (Tailscale or WireGuard); do not
-publish these applications to the Internet. The custom app has no login yet,
-so keep it behind proxy access controls. Initialize Actual through HTTPS; bank
+publish these applications to the Internet. The custom app requires member login;
+keep the existing proxy access controls. Initialize Actual through HTTPS; bank
 credentials and SimpleFIN setup belong in Actual, never in Git. Household budget
 configuration and imports are operator follow-up, outside this skeleton.
 
@@ -72,8 +72,8 @@ npm run build
 npm run dev
 ```
 
-`npm test` currently runs the TypeScript check; there is no behavioral test suite
-at this stage. Development listens on loopback. The Docker image runs the
+`npm test` runs ownership/authentication and embedded PostgreSQL tests, plus
+Actual SDK failure/retry/timeout checks. Development listens on loopback. The Docker image runs the
 standalone production server as a non-root user. Next.js serves the Node API
 routes in the same process; no separate API microservice is needed.
 

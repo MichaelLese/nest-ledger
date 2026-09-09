@@ -12,6 +12,7 @@ try {
     password: process.env.ACTUAL_BUDGET_PASSWORD || undefined,
   });
   const accounts = await api.getAccounts();
+  const payees = await api.getPayees();
   const categories = await api.getCategories();
   const schedules = await api.getSchedules();
   const transactions = [];
@@ -19,7 +20,7 @@ try {
     transactions.push(...await api.getTransactions(account.id, process.env.ACTUAL_START_DATE, process.env.ACTUAL_END_DATE));
   }
   await api.shutdown();
-  process.send({ accounts, transactions, categories, schedules }, () => process.exit(0));
+  process.send({ accounts, transactions, categories, schedules, payees }, () => process.exit(0));
 } catch {
   // The parent reports a sanitized error. Exit also releases partially initialized SDK state.
   process.exit(1);

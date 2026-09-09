@@ -8,7 +8,7 @@
     "dev": "npm run dev --workspace app",
     "typecheck": "npm run typecheck --workspace app",
     "build": "npm run build --workspace app",
-    "test": "npm run typecheck",
+    "test": "npm run typecheck && tsx --test app/tests/ownership.test.ts && npm run test:actual",
     "actual:smoke": "node --env-file-if-exists=infrastructure/.env app/scripts/actual-smoke.mjs",
     "test:actual": "node --test app/tests/actual-summary.test.mjs"
   },
