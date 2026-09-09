@@ -17,13 +17,13 @@ ownership, responsibility, reconciliation, and simplified visualization.
 
 ## Core design rules
 - One shared household Actual budget; account ownership ≠ transaction ownership.
-- Track "who owns the expense" (ME / WIFE / JOINT) separately from "who paid it".
+- Track "who owns the expense" (MICHAEL / LIZ / JOINT) separately from "who paid it".
 - Use Actual categories for *what* the money was for; custom metadata for *who it belongs to / who paid*.
 - Never infer expense ownership solely from the paying bank account.
 - Extend Actual Schedules for bills; never build a second recurrence engine.
 - Use Actual split transactions wherever possible so card transactions remain intact.
 - Never rebuild Actual Budget in the custom app; never store a second financial ledger.
-- Global UI filter is always: **ALL | ME | WIFE | JOINT**.
+- Global UI filter is always: **ALL | MICHAEL | LIZ | JOINT**.
 - One straightforward stack (Next.js + TypeScript + Tailwind frontend, Node + TypeScript backend,
   @actual-app/api, PostgreSQL, Docker Compose). Avoid microservices.
 
