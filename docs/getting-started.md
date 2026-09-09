@@ -8,6 +8,9 @@ page, `/api/health`, and a read-only `/api/actual/summary` endpoint. See
 and the household metadata SQL migration. Authentication and household workflows
 are not implemented yet. The health endpoint checks process liveness only.
 
+The live CT 116 deployment, private HTTPS URLs, backup automation and restore
+procedure are recorded in [Deployment and recovery](deployment.md).
+
 ## Prepare the LXC
 
 Create a Debian 13 **unprivileged** LXC named `nest-ledger`, enable nesting,
@@ -85,7 +88,9 @@ a PostgreSQL `pg_dump`, Compose/configuration (including the protected `.env`),
 and daily Proxmox/PBS backups. Stop Actual while copying its volume for a
 consistent backup; use `pg_dump` rather than copying a live PostgreSQL directory.
 Retain weekly snapshots and monthly backups, and periodically restore both
-services into an isolated LXC. Backup automation is not included in this skeleton.
+services into an isolated LXC. The initial skeleton did not include backup automation; the CT 116 deployment
+now has a daily permission-protected off-CT backup described in the deployment
+runbook. Encryption and Proxmox/PBS policy remain separate follow-up.
 
 Validation on the authoring host is recorded in the local commit/session outcome;
 Docker startup, persistence and HTTPS must be checked on the target LXC.
