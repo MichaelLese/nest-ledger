@@ -68,7 +68,8 @@ financial-data endpoint behind the existing proxy access controls and LAN/VPN.
 
 ## PostgreSQL metadata
 
-Apply the numbered SQL migration **once**, to the household database:
+Back up the household database, then apply each numbered SQL migration **once**,
+in order. For a fresh metadata database, first apply 001:
 
 ```sh
 docker compose --env-file infrastructure/.env -f infrastructure/compose.yaml exec -T postgres \
@@ -76,9 +77,36 @@ docker compose --env-file infrastructure/.env -f infrastructure/compose.yaml exe
   < infrastructure/migrations/001_household_metadata.sql
 ```
 
-The migration runs atomically and deliberately fails on reapplication. Apply
-future numbered migrations in order; back up first. It is not applied silently
-at application startup and works with existing Compose volumes. PostgreSQL
+Then apply [002_household_member_names.sql](../infrastructure/migrations/002_household_member_names.sql)
+to rename the seeded members to MICHAEL/Michael, LIZ/Liz and JOINT/Joint household:
+
+```sh
+docker compose --env-file infrastructure/.env -f infrastructure/compose.yaml exec -T postgres \
+  sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' \
+  < infrastructure/migrations/002_household_member_names.sql
+```
+
+002 requires exactly the three original member types and empty
+`transaction_metadata` and `bills`; it checks these under table locks and fails
+without changes if they differ. It updates members in place, preserving UUIDs,
+the unique type key, and all five member foreign keys (four to `type`, and
+`bills.responsible_person` to `id`). The new `household_members_type_check_002`
+constraint allows only MICHAEL/LIZ/JOINT and acts as a reapplication guard.
+The migration prints `SELECT type, name FROM household_members` before and after.
+The app currently has no member type literals or unions to update. The existing
+`split_rules.me_percentage` and `wife_percentage` storage column names remain
+unchanged; they correspond to Michael and Liz respectively.
+
+CT 116: 002 was applied once on 2026-09-09 using `ON_ERROR_STOP=1`, with
+`UPDATE 3` and `COMMIT`. Before: ME/Me, WIFE/Wife, JOINT/Joint household.
+After: MICHAEL/Michael, LIZ/Liz, JOINT/Joint household. All three UUIDs and
+all five member foreign keys were verified unchanged; both dependent tables
+remained empty. A protected off-CT PostgreSQL dump was taken beforehand.
+Do not reapply 001 or 002 to this deployment.
+
+Each migration runs atomically and deliberately fails on reapplication. Apply
+future numbered migrations in order; back up first. They are not applied silently
+at application startup and work with existing Compose volumes. PostgreSQL
 remains unpublished on the internal database network.
 
 The five tables mirror section 5. Members include a JOINT household identity;
