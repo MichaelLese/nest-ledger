@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+:root { color-scheme: dark; font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; }
+* { box-sizing: border-box; }
+main { max-width: 1050px; margin: auto; padding: 32px 20px; }
+h1 { font-size: 1.9rem; font-weight: 700; margin-bottom: 12px; }
+h2 { font-size: 1.1rem; font-weight: 600; overflow-wrap: anywhere; }
+p { margin: 12px 0; color: #cbd5e1; }
+header, .transaction-heading, .toolbar, nav, .actions { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+nav { justify-content: flex-start; margin-top: 24px; }
+button, input, select, textarea { font: inherit; border: 1px solid #64748b; border-radius: 6px; padding: 10px 12px; background: #1e293b; color: #f8fafc; }
+button { cursor: pointer; min-height: 44px; }
+button:hover { background: #334155; }
+button[aria-pressed=true], button.primary { background: #0f766e; border-color: #5eead4; }
+button:disabled { opacity: .5; cursor: wait; }
+:focus-visible { outline: 3px solid #5eead4; outline-offset: 3px; }
+article { margin: 20px 0; padding: 20px; border: 1px solid #475569; border-radius: 10px; background: #172033; }
+label { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+label.check { flex-direction: row; align-items: center; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 16px; }
+textarea { min-height: 65px; width: 100%; }
+fieldset { border: 0; padding: 0; min-width: 0; }
+.status { color: #99f6e4; }
+.login { max-width: 430px; padding-top: 80px; }
+[role=alert] { color: #fda4af; }

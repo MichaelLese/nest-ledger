@@ -47,7 +47,7 @@ curl -i http://127.0.0.1:3000/api/actual/summary
 ```
 
 The internal GET endpoint returns `accounts`, `transactions`, `categories` and
-`schedules`. Transactions cover the current UTC calendar month through today,
+`schedules`, plus `payees` for ownership display. Transactions cover the current UTC calendar month through today,
 inclusively, across all returned accounts; other lists are complete. Amounts
 retain Actual's integer representation and transaction splits remain intact.
 There are no ledger mutation or bank-sync calls. The SDK downloads a temporary
@@ -63,8 +63,8 @@ remove these only when no reads are running.
 
 Missing configuration, connection/authentication errors and timeouts produce
 sanitized HTTP 503 JSON; `/api/health` remains a liveness check. Responses use
-`Cache-Control: no-store`. No application authentication exists yet: keep this
-financial-data endpoint behind the existing proxy access controls and LAN/VPN.
+`Cache-Control: no-store`. The endpoint now requires a household session cookie (401 without login); see
+[Phase 4 ownership](ownership.md). Keep existing proxy access controls and LAN/VPN.
 
 ## PostgreSQL metadata
 
@@ -93,7 +93,7 @@ the unique type key, and all five member foreign keys (four to `type`, and
 `bills.responsible_person` to `id`). The new `household_members_type_check_002`
 constraint allows only MICHAEL/LIZ/JOINT and acts as a reapplication guard.
 The migration prints `SELECT type, name FROM household_members` before and after.
-The app currently has no member type literals or unions to update. The existing
+The Phase 4 app uses MICHAEL/LIZ/JOINT member types. The existing
 `split_rules.me_percentage` and `wife_percentage` storage column names remain
 unchanged; they correspond to Michael and Liz respectively.
 
@@ -121,7 +121,7 @@ The singleton settings row defaults to USD, Etc/UTC, month start 1 and a 50/50
 split; change these for the household. Month start is limited to 1–28 so it exists
 in every month. Split rules currently represent percentages totaling 100.
 Custom dollar allocation needs a later metadata extension and reconciliation
-implementation; it is not represented as a second ledger. Review and ownership
-workflows, schedule snapshot refresh, authentication, and live synchronization
+implementation; it is not represented as a second ledger. Review, ownership and authentication are implemented in
+[Phase 4](ownership.md). Schedule snapshot refresh and live synchronization
 acceptance remain subsequent work. Switching to a different Actual budget needs
 a separate metadata database or explicit metadata reset/migration.

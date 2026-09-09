@@ -1,8 +1,7 @@
-export default function Home() {
-  return (
-    <main className="min-h-screen bg-slate-950 p-8 text-slate-100">
-      <h1 className="text-3xl font-semibold">Hello, Nest Ledger</h1>
-      <p className="mt-4">The household dashboard skeleton is running.</p>
-    </main>
-  );
+import { currentMember } from '../server/auth';
+import OwnershipApp from './ownership-app';
+export const dynamic = 'force-dynamic';
+export default async function Home() {
+  try { return <OwnershipApp member={await currentMember()} />; }
+  catch { return <main><h1>Nest Ledger</h1><p role="alert">Household database unavailable. Please try again later.</p></main>; }
 }
