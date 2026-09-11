@@ -147,10 +147,20 @@ missing dates/responsibility have explicit placeholders.
 
 The pinned Actual API 26.9.0 `scheduleModel.toExternal` exposes `name`, `next_date`
 and `amount`, not `next_amount`. Numeric integer amounts (including zero) retain
-Actual's sign and display as schedule amounts. Missing or range amounts show
+Actual's sign in the payload and display as positive obligations on bill cards. Missing or range amounts show
 “No fixed amount available”; no midpoint, next amount or recurrence date is
-calculated. This surface lists the schedules returned by Actual without a local
-due-soon calculation or completion filter.
+calculated. Cards sort by `next_date` ascending with missing dates last. UTC calendar dates
+before today show a red “overdue” badge; today through seven days ahead show an
+amber “due in N d” badge. Later or missing dates have no urgency badge. No local
+recurrence dates or completion filter are added.
+
+The pinned SDK also exposes `account`, passed unchanged through the summary
+worker. Bills resolve that ID against summary accounts to display the paying
+account name; missing or unresolved IDs show “Source: Actual schedule · Paying
+account unavailable”. Account names never assign responsibility. Cards show the
+selected responsible member as a chip, or a muted “Unassigned” button that focuses
+the responsibility choices, plus an always-visible autopay status pill. Selection
+changes remain drafts until Save succeeds.
 
 Each card saves responsibility (MICHAEL/LIZ/JOINT) and an autopay reminder through
 `PUT /api/ownership/bills`, with the existing session and origin checks. The server

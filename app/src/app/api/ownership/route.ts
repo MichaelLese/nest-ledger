@@ -15,7 +15,7 @@ export async function GET() {
     const transactions = leaves(summary.transactions);
     const config = await householdConfig();
     const metadata = new Map((await readMetadata(transactions.map(t => t.id))).map(m => [m.actual_transaction_id, m]));
-    const bills = billCards(summary.schedules, await readBills((summary.schedules ?? []).map(s => s.id)));
+    const bills = billCards(summary.schedules, await readBills((summary.schedules ?? []).map(s => s.id)), summary.accounts);
     return Response.json({ member, ...config, bills, summary: monthlySummary(summary, [...metadata.values()]), transactions: transactions.map(t => {
       const account = summary.accounts.find(a => a.id === t.account)?.name ?? 'Unknown account';
       return { id: t.id, date: t.date, amount: t.amount, transfer_id: t.transfer_id, description: summary.payees?.find(p => p.id === t.payee)?.name || t.notes || 'Transaction', account, categoryName: categoryName(t, summary.categories), parentId: t.parent_id ?? null,
