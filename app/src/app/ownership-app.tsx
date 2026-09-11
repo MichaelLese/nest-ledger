@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useId, useState } from 'react';
 import { allocate, members, type Member, type Metadata, type SplitRule } from '../server/ownership';
+import { monthlySummary, type MonthlySummary } from '../server/monthly-summary';
 import type { LoginMember } from '../server/session';
-type Row = { id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
-type Data = { rules: SplitRule[]; defaultSplit: string | null; currency: string; transactions: Row[] };
+type Row = { transfer_id?: string | null; id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
+type Data = { summary: MonthlySummary; rules: SplitRule[]; defaultSplit: string | null; currency: string; transactions: Row[] };
 async function api(path: string, method = 'GET', body?: unknown) {
   const response = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const data = await response.json();
@@ -43,8 +44,25 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
     {error && <p role="alert">{error}</p>}
     {data && <><p role="status">{shown.length} transactions shown · {data.transactions.filter(t => t.metadata.review_status === 'NEEDS_REVIEW').length} need review this month</p>
       {shown.length === 0 && <p>No transactions match this view.</p>}
-      {shown.map(row => <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}</>}
+      {shown.map(row => <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}
+      <MonthlyOverview data={data} /></>}
   </main>;
+}
+function MonthlyOverview({ data }: { data: Data }) {
+  // Recalculate owners from saved rows so successful tagging updates the cards immediately.
+  const owners = monthlySummary({ transactions: data.transactions, accounts: [], categories: [] }, data.transactions.map(row => row.metadata), data.summary.through).owners;
+  const money = (amount: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency }).format(amount / 100);
+  return <section className="monthly-summary" aria-labelledby="monthly-summary-title">
+    <h2 id="monthly-summary-title">Monthly household spending</h2>
+    <p>{data.summary.from} – {data.summary.through} · UTC <span className="review-status">All household transactions</span></p>
+    <p>Spending excludes income, refunds and transfers. Saved owner tags count even when awaiting review. Review filters do not change these totals.</p>
+    <div className="summary-cards">{([...members, 'UNCLASSIFIED'] as const).map(owner => <article className="review-card" key={owner}>
+      <h3>{owner === 'UNCLASSIFIED' ? 'Unclassified' : owner}</h3><strong className="transaction-amount">{money(owners[owner])}</strong>
+    </article>)}</div>
+    <article className="review-card"><h3>Top categories <span className="review-status">Overall · up to 8</span></h3>
+      {data.summary.topCategories.length === 0 ? <p>No spending this month.</p> : <ol className="summary-categories">{data.summary.topCategories.map(category => <li key={category.id ?? 'uncategorized'}><span>{category.name}</span><strong className="transaction-amount">{money(category.amount)}</strong></li>)}</ol>}
+    </article>
+  </section>;
 }
 function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSaved: (m: Metadata) => void }) {
   const advancedId = useId();

@@ -108,5 +108,30 @@ still needs to check:
 - JOINT 50/50 preview, odd-cent/refund rounding, personal owner clearing the rule,
   and persistence across app restart. Verify Actual transaction data is unchanged.
 
-Bills, schedules, dashboards, reconciliation, backups, historical browsing, rule
+Bills, schedules, reconciliation, backups, historical browsing, rule
 editing, OIDC and infrastructure work are outside this implementation.
+
+## Phase 5 monthly summary
+
+The existing authenticated `GET /api/ownership` response adds a `summary` key
+with `from` / `through` UTC dates, `owners` (MICHAEL, LIZ, JOINT, UNCLASSIFIED),
+and `topCategories` (up to eight `{ id, name, amount }` rows). Existing review
+fields and writes retain their contracts. The summary reuses the same Actual
+read and metadata query; no additional ledger or database writes are introduced.
+Amounts are positive integer Actual minor units representing **gross spending**:
+negative leaf transactions only, excluding linked transfers (`transfer_id`).
+Income, refunds, and zero amounts are excluded rather than netted against spend.
+The range is the current UTC calendar month through today, inclusive.
+
+Saved expense ownership determines the bucket regardless of review status;
+missing/null owners are Unclassified. Account names and payer tags never assign
+ownership. JOINT remains its own bucket, with no allocation to personal totals.
+Actual split children count once via `leaves()`; parents are excluded.
+Categories aggregate across all owners by Actual category ID, including hidden
+categories. Missing categories display as Uncategorized; unresolved IDs display
+as Unknown category. Ordering is descending spend, then name and ID for ties.
+
+The section below the review queue always shows the whole household, independent
+of review filters. Successful tagging updates owner cards immediately from saved
+rows; Refresh reloads the full summary. Currency uses household settings and the
+existing minor-unit formatter. This slice adds no charts or dependencies.

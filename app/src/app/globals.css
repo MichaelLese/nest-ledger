@@ -55,3 +55,12 @@ button.advanced-toggle:hover { background: #334155; color: #e2e8f0; }
 }
 .login { max-width: 430px; padding-top: 80px; }
 [role=alert] { color: #fda4af; }
+
+.monthly-summary { margin-top: 32px; border-top: 1px solid #475569; padding-top: 24px; }
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.summary-cards .review-card { margin: 0; }
+.summary-cards h3 { color: #94a3b8; font-size: .85rem; margin-bottom: 8px; }
+.summary-cards strong { font-size: 1.25rem; }
+.summary-categories { padding: 0; margin-top: 12px; list-style: none; }
+.summary-categories li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-top: 1px solid #334155; }
+.summary-categories li > span { min-width: 0; overflow-wrap: anywhere; }
