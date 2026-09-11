@@ -64,3 +64,5 @@ button.advanced-toggle:hover { background: #334155; color: #e2e8f0; }
 .summary-categories { padding: 0; margin-top: 12px; list-style: none; }
 .summary-categories li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-top: 1px solid #334155; }
 .summary-categories li > span { min-width: 0; overflow-wrap: anywhere; }
+
+.bill-card h3 { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }

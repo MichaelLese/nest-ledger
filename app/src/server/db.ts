@@ -18,3 +18,16 @@ export async function saveMetadata(m: Metadata) {
     notes=EXCLUDED.notes, review_status=EXCLUDED.review_status`,
   [m.actual_transaction_id, m.expense_owner, m.payer, m.split_rule, m.notes, m.review_status]);
 }
+
+export async function readBills(ids: string[]) {
+  return (await db.query<import('./bills').BillMetadata>(`SELECT b.actual_schedule_id, m.type AS responsible_person, b.autopay
+    FROM bills b LEFT JOIN household_members m ON m.id = b.responsible_person
+    WHERE b.actual_schedule_id = ANY($1::text[])`, [ids])).rows;
+}
+export async function saveBills(m: import('./bills').BillMetadata, scheduleName: string) {
+  await db.query(`INSERT INTO bills (actual_schedule_id, name, responsible_person, autopay)
+    VALUES ($1, $2, (SELECT id FROM household_members WHERE type = $3), $4)
+    ON CONFLICT (actual_schedule_id) DO UPDATE SET name=EXCLUDED.name,
+    responsible_person=EXCLUDED.responsible_person, autopay=EXCLUDED.autopay`,
+  [m.actual_schedule_id, scheduleName, m.responsible_person, m.autopay]);
+}

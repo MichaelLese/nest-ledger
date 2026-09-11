@@ -2,9 +2,10 @@
 import { useEffect, useId, useState } from 'react';
 import { allocate, members, type Member, type Metadata, type SplitRule } from '../server/ownership';
 import { monthlySummary, type MonthlySummary } from '../server/monthly-summary';
+import type { BillCard, BillMetadata } from '../server/bills';
 import type { LoginMember } from '../server/session';
 type Row = { transfer_id?: string | null; id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
-type Data = { summary: MonthlySummary; rules: SplitRule[]; defaultSplit: string | null; currency: string; transactions: Row[] };
+type Data = { bills: BillCard[]; summary: MonthlySummary; rules: SplitRule[]; defaultSplit: string | null; currency: string; transactions: Row[] };
 async function api(path: string, method = 'GET', body?: unknown) {
   const response = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const data = await response.json();
@@ -45,7 +46,12 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
     {data && <><p role="status">{shown.length} transactions shown · {data.transactions.filter(t => t.metadata.review_status === 'NEEDS_REVIEW').length} need review this month</p>
       {shown.length === 0 && <p>No transactions match this view.</p>}
       {shown.map(row => <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}
-      <MonthlyOverview data={data} /></>}
+      <MonthlyOverview data={data} />
+      <section className="monthly-summary" aria-labelledby="bills-title"><h2 id="bills-title">Upcoming bills</h2>
+        <p>All household schedules from Actual. Responsibility and autopay are household reminders.</p>
+        {data.bills.length === 0 && <p>No schedules configured in Actual yet.</p>}
+        {data.bills.map(row => <BillEditor key={row.actual_schedule_id} row={row} currency={data.currency} onSaved={metadata => setData(current => current && ({ ...current, bills: current.bills.map(b => b.actual_schedule_id === row.actual_schedule_id ? { ...b, ...metadata } : b) }))} />)}
+      </section></>}
   </main>;
 }
 function MonthlyOverview({ data }: { data: Data }) {
@@ -100,6 +106,36 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
       {draft.expense_owner === 'JOINT' && <label>Joint split<select value={draft.split_rule ?? ''} onChange={e => setDraft({ ...draft, split_rule: e.target.value || null })}><option value="">Choose split</option>{data.rules.map(r => <option key={r.id} value={r.id}>{r.name} (Michael {r.me_percentage}% / Liz {r.wife_percentage}%)</option>)}</select></label>}</div>
       {split && <p>Split preview: Michael {money(split.MICHAEL)} · Liz {money(split.LIZ)}. Applies to this transaction only.</p>}
       <label>Household notes<textarea maxLength={2000} value={draft.notes ?? ''} onChange={e => setDraft({ ...draft, notes: e.target.value || null })} /></label>
+    </div></fieldset>
+    {message && <p role="status">{message}</p>}
+  </article>;
+}
+
+function BillEditor({ row, currency, onSaved }: { row: BillCard; currency: string; onSaved: (m: BillMetadata) => void }) {
+  const [draft, setDraft] = useState<BillMetadata>(row);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  useEffect(() => { setDraft(row); }, [row]);
+  async function save() {
+    setBusy(true); setMessage('');
+    try {
+      const result = await api('/api/ownership/bills', 'PUT', { actual_schedule_id: row.actual_schedule_id, responsible_person: draft.responsible_person, autopay: draft.autopay });
+      onSaved(result.metadata); setMessage('Bill saved.');
+    } catch (e) { setMessage((e as Error).message); }
+    finally { setBusy(false); }
+  }
+  return <article className="review-card bill-card" aria-label={row.name}>
+    <div className="transaction-heading"><h3>{row.name}</h3>
+      {row.amount !== null && <strong className="transaction-amount">{new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(row.amount / 100)}</strong>}
+    </div>
+    <div className="transaction-meta"><span>{row.next_date ? `Next date: ${row.next_date}` : 'No next date available'}</span>
+      <span>{row.amount === null ? 'No fixed amount available' : 'Schedule amount'}</span>
+      {!row.responsible_person && <span>Responsibility not set</span>}
+    </div>
+    <fieldset disabled={busy}><div className="ownership-controls">
+      <div className="owner-control" role="group" aria-label="Responsible person"><span>Responsible person</span><div className="owner-buttons">{members.map(person => <button type="button" key={person} aria-pressed={draft.responsible_person === person} onClick={() => setDraft({ ...draft, responsible_person: person })}>{person}</button>)}</div></div>
+      <label className="check"><input type="checkbox" checked={draft.autopay} onChange={e => setDraft({ ...draft, autopay: e.target.checked })} />Autopay</label>
+      <div className="actions"><button type="button" onClick={save}>{busy ? 'Saving…' : 'Save'}</button></div>
     </div></fieldset>
     {message && <p role="status">{message}</p>}
   </article>;
