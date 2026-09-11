@@ -27,3 +27,6 @@ Historical transaction review cards are read-only; metadata PUT continues to
 validate against the no-argument current-month summary. Auth, bills, tagging,
 and split behavior are unchanged. No new dependencies or infrastructure edits.
 No live household credentials or live budget were used for these checks.
+
+Historical editing supersedes the read-only choice above: see the current
+ownership and Actual integration documentation for the month-scoped PUT contract.

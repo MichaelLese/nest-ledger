@@ -130,8 +130,8 @@ a separate metadata database or explicit metadata reset/migration.
 
 `getActualSummary(range?: { from: string; through: string })` accepts an optional
 inclusive ISO date range. With no argument it still reads the current UTC month
-from day 01 through today. Existing summary and metadata-save callers retain
-that default. Ownership GET accepts a single `?month=YYYY-MM`; missing means
+from day 01 through today. Callers without a range retain
+that default. Ownership GET and PUT accept a single `?month=YYYY-MM`; missing means
 current month, malformed/empty/duplicate values return 400. Historical months
 use their full calendar range, including leap days. The picker stops at the
 current month; valid future API months return their calendar range.
@@ -144,6 +144,9 @@ worker calls `getTransactions(account.id, ACTUAL_START_DATE, ACTUAL_END_DATE)`.
 No new SDK calls or endpoints are added. Credentials, the 30-second child
 termination, sanitized 503 responses, and no-store headers are unchanged.
 
-Historical review cards show recorded metadata read-only. Current-month editing
-and save validation remain unchanged. Upcoming bills still show current Actual
+Historical review cards use the same transaction editor and save/confirm flow as
+current-month cards. Saves send the displayed month to PUT, which validates the
+transaction ID against Actual leaf transactions within that inclusive range;
+missing or out-of-month IDs return 409 without writing metadata. PUT without a
+month retains the existing current-month validation. Upcoming bills still show current Actual
 schedules, independently of the selected spending month.
