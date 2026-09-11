@@ -77,10 +77,12 @@ Both `/api/ownership` and `/api/actual/summary` now require login. `/api/health`
 remains public process liveness. Protected responses use `Cache-Control: no-store`.
 CLI `npm run actual:smoke` remains a credentialed local operator tool.
 
-**Deployment prerequisite:** this task does not change Compose or deploy anything.
-The existing Compose environment does not forward these AUTH variables. A future,
-separately authorized deployment must wire all four into the web process before
-login works. Keep the private HTTPS/LAN/VPN controls in place.
+**Deployment configuration:** `infrastructure/compose.yaml` forwards all four
+AUTH variables to the web process with `${VAR:-}` empty defaults. Set them in the
+protected `infrastructure/.env` on the deployment host and pass that file using
+Compose's `--env-file` option. With these variables unset in local development,
+authentication remains unconfigured and login fails closed. Keep secrets out of
+Git and keep the private HTTPS/LAN/VPN controls in place.
 
 ## Validation and operator acceptance
 
