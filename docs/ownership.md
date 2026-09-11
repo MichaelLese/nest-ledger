@@ -108,8 +108,9 @@ still needs to check:
 - JOINT 50/50 preview, odd-cent/refund rounding, personal owner clearing the rule,
   and persistence across app restart. Verify Actual transaction data is unchanged.
 
-Bills, schedules, reconciliation, backups, historical browsing, rule
-editing, OIDC and infrastructure work are outside this implementation.
+Reconciliation, backups, historical browsing, rule editing, OIDC and
+infrastructure work remain outside this implementation. Phase 5 bills are
+described below.
 
 ## Phase 5 monthly summary
 
@@ -135,3 +136,31 @@ The section below the review queue always shows the whole household, independent
 of review filters. Successful tagging updates owner cards immediately from saved
 rows; Refresh reloads the full summary. Currency uses household settings and the
 existing minor-unit formatter. This slice adds no charts or dependencies.
+
+## Phase 5 bills surface
+
+`GET /api/ownership` adds `bills`, matching Actual schedules to household metadata
+by `actual_schedule_id`. Upcoming bills appears below the monthly summary and
+shows all household schedules independently of transaction review filters. Empty
+schedules show “No schedules configured in Actual yet.” Unnamed schedules and
+missing dates/responsibility have explicit placeholders.
+
+The pinned Actual API 26.9.0 `scheduleModel.toExternal` exposes `name`, `next_date`
+and `amount`, not `next_amount`. Numeric integer amounts (including zero) retain
+Actual's sign and display as schedule amounts. Missing or range amounts show
+“No fixed amount available”; no midpoint, next amount or recurrence date is
+calculated. This surface lists the schedules returned by Actual without a local
+due-soon calculation or completion filter.
+
+Each card saves responsibility (MICHAEL/LIZ/JOINT) and an autopay reminder through
+`PUT /api/ownership/bills`, with the existing session and origin checks. The server
+validates the payload and checks that the schedule still exists in a fresh Actual
+summary before upserting only its household bills row. It uses the Actual name
+for the required name snapshot, resolves member type to the existing UUID foreign
+key, and preserves all other bill metadata. Autopay is a household annotation;
+it does not enable Actual posting or bank payments. Failed saves retain drafts.
+Refresh discards drafts. No Actual writes or schema changes are introduced.
+
+Operator acceptance after a separately authorized deployment should cover an
+empty schedule list, a named schedule with a date/amount, missing optional fields,
+responsibility/autopay persistence after refresh, and mobile/keyboard controls.
