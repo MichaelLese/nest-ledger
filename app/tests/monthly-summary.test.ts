@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { monthlySummary } from '../src/server/monthly-summary';
+import { monthRange, monthlySummary } from '../src/server/monthly-summary';
 import type { Metadata, Summary, Transaction } from '../src/server/ownership';
 const through = '2026-09-11';
 const transaction = (id: string, amount: number, category: string | null = 'food'): Transaction => ({ id, amount, category, account: 'Michael Checking', date: '2026-09-01' });
@@ -35,4 +35,32 @@ test('categories aggregate by ID across owners, sort by spend and deterministic 
   assert.deepEqual(result.topCategories, [{ id: 'food', name: 'Food', amount: 300 }, { id: 'home', name: 'Home', amount: 300 }, { id: 'missing', name: 'Unknown category', amount: 6 }, { id: null, name: 'Uncategorized', amount: 5 }]);
   const many = monthlySummary(actual(Array.from({ length: 10 }, (_, i) => transaction(String(i), -(i + 1), String(i)))), [], through);
   assert.deepEqual(many.topCategories.map(row => row.amount), [10, 9, 8, 7, 6, 5, 4, 3]);
+});
+
+test('missing and explicit current month use today as the inclusive end', () => {
+  for (const month of [null, '2026-09']) assert.deepEqual(monthRange(month, through), { from: '2026-09-01', through });
+});
+test('month ranges handle leap years, month lengths and year boundaries', () => {
+  for (const [month, end] of [['2026-08', '31'], ['2026-04', '30'], ['2024-02', '29'], ['2025-02', '28'], ['2025-12', '31'], ['2027-01', '31'], ['0001-01', '31'], ['9999-12', '31']]) {
+    assert.deepEqual(monthRange(month, through), { from: month + '-01', through: month + '-' + end });
+  }
+});
+test('malformed month queries are rejected strictly', () => {
+  for (const month of ['', '2026-9', '26-09', '2026-00', '2026-13', '0000-01', '2026-09-01', ' 2026-09', '2026-09 ', '2026-09\n', 'September', '+2026-09']) {
+    assert.throws(() => monthRange(month, through), /Month must be YYYY-MM/);
+  }
+});
+test('historical summary includes both boundaries and leaves untagged spending unclassified', () => {
+  const rows = ['2026-07-31', '2026-08-01', '2026-08-31', '2026-09-01'].map((date, i) => ({ ...transaction(String(i), -100), date }));
+  const result = monthlySummary(actual(rows), [tag('3', 'MICHAEL')], monthRange('2026-08', through).through);
+  assert.equal(result.from, '2026-08-01');
+  assert.equal(result.through, '2026-08-31');
+  assert.deepEqual(result.owners, { MICHAEL: 0, LIZ: 0, JOINT: 0, UNCLASSIFIED: 200 });
+  assert.deepEqual(result.topCategories, [{ id: 'food', name: 'Food', amount: 200 }]);
+});
+test('explicit leap February includes split leaves once and excludes March', () => {
+  const child = { ...transaction('child', -123), date: '2024-02-29', parent_id: 'parent' };
+  const rows = [{ ...transaction('parent', -123), date: '2024-02-29', is_parent: true, subtransactions: [child] }, child, { ...transaction('march', -456), date: '2024-03-01' }];
+  const result = monthlySummary(actual(rows), [tag('child', 'LIZ')], monthRange('2024-02', through).through);
+  assert.deepEqual(result.owners, { MICHAEL: 0, LIZ: 123, JOINT: 0, UNCLASSIFIED: 0 });
 });

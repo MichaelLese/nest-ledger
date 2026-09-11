@@ -53,7 +53,7 @@ retain Actual's integer representation and transaction splits remain intact.
 There are no ledger mutation or bank-sync calls. The SDK downloads a temporary
 local budget (required by Actual's architecture), removed after each request.
 It is not written to PostgreSQL. SDK shutdown may perform its normal sync, but
-this integration makes no edits. Concurrent requests share one in-flight read.
+this integration makes no edits. Concurrent requests for the same date range share one in-flight read.
 A child process bounds SDK failures/hangs to 30 seconds and keeps SDK diagnostics
 out of HTTP responses and app logs. Large budgets may exceed that limit. Each
 request downloads afresh; this is a diagnostic foundation, not a polling feed.
@@ -125,3 +125,25 @@ implementation; it is not represented as a second ledger. Review, ownership and 
 [Phase 4](ownership.md). Schedule snapshot refresh and live synchronization
 acceptance remain subsequent work. Switching to a different Actual budget needs
 a separate metadata database or explicit metadata reset/migration.
+
+## Historical month browsing
+
+`getActualSummary(range?: { from: string; through: string })` accepts an optional
+inclusive ISO date range. With no argument it still reads the current UTC month
+from day 01 through today. Existing summary and metadata-save callers retain
+that default. Ownership GET accepts a single `?month=YYYY-MM`; missing means
+current month, malformed/empty/duplicate values return 400. Historical months
+use their full calendar range, including leap days. The picker stops at the
+current month; valid future API months return their calendar range.
+
+The same worker calls `init` with `dataDir`, `serverURL`, `password`, and
+`verbose: false`, then `downloadBudget(ACTUAL_SYNC_ID, { password:
+ACTUAL_BUDGET_PASSWORD || undefined })`. The parent passes `from` as
+`ACTUAL_START_DATE` and `through` as `ACTUAL_END_DATE`; for each account the
+worker calls `getTransactions(account.id, ACTUAL_START_DATE, ACTUAL_END_DATE)`.
+No new SDK calls or endpoints are added. Credentials, the 30-second child
+termination, sanitized 503 responses, and no-store headers are unchanged.
+
+Historical review cards show recorded metadata read-only. Current-month editing
+and save validation remain unchanged. Upcoming bills still show current Actual
+schedules, independently of the selected spending month.

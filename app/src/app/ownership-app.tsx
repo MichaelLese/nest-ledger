@@ -18,12 +18,23 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Member | 'ALL'>('ALL');
   const [queue, setQueue] = useState(true);
-  async function load() {
-    setLoading(true); setError('');
-    try { setData(await api('/api/ownership')); } catch (e) { setError((e as Error).message); }
-    finally { setLoading(false); }
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const [month, setMonth] = useState(currentMonth);
+  const [refresh, setRefresh] = useState(0);
+  const historical = month < currentMonth;
+  useEffect(() => {
+    if (!member) return;
+    let active = true;
+    setLoading(true); setError(''); setData(null);
+    api(`/api/ownership?month=${month}`).then(result => {
+      if (active) setData(result);
+    }).catch(e => { if (active) setError((e as Error).message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [member, month, refresh]);
+  function changeMonth(value: string) {
+    setData(null); setMonth(value);
   }
-  useEffect(() => { if (member) void load(); }, [member]);
   if (!member) return <main className="login"><h1>Nest Ledger</h1><p>Sign in to review household transactions.</p>
     <form onSubmit={async e => {
       e.preventDefault(); setError(''); setLoading(true);
@@ -38,15 +49,20 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   return <main><header><div><h1>Transaction ownership</h1><p>Signed in as {member}</p></div><button onClick={async () => {
     try { await api('/api/auth/logout', 'POST'); window.location.reload(); } catch (e) { setError((e as Error).message); }
   }}>Sign out</button></header>
-    <p>Current UTC month through today. Confirm who owns each expense and who paid it. Account hints need your confirmation.</p>
+    <p>{historical ? 'Historical UTC month. Transaction cards are read-only.' : 'Current UTC month through today. Confirm who owns each expense and who paid it. Account hints need your confirmation.'}</p>
     <nav aria-label="Expense owner filter">{(['ALL', ...members] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value}</button>)}</nav>
-    <div className="toolbar"><label className="check"><input type="checkbox" checked={queue} onChange={e => setQueue(e.target.checked)} />Needs review only</label><button disabled={loading} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button></div>
+    <div className="toolbar"><label className="check"><input type="checkbox" checked={queue} onChange={e => setQueue(e.target.checked)} />Needs review only</label><button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</button></div>
     <p>Filters use confirmed expense ownership. Untagged transactions appear under ALL.</p>
     {error && <p role="alert">{error}</p>}
+    <section className="monthly-summary" aria-labelledby="monthly-summary-title">
+      <h2 id="monthly-summary-title">Monthly household spending</h2>
+      <MonthPicker month={month} currentMonth={currentMonth} onChange={changeMonth} />
+      {loading && <p role="status">Loading selected month…</p>}
+      {data && <MonthlyOverview data={data} />}
+    </section>
     {data && <><p role="status">{shown.length} transactions shown · {data.transactions.filter(t => t.metadata.review_status === 'NEEDS_REVIEW').length} need review this month</p>
       {shown.length === 0 && <p>No transactions match this view.</p>}
-      {shown.map(row => <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}
-      <MonthlyOverview data={data} />
+      {shown.map(row => historical ? <HistoricalTransaction key={row.id} row={row} currency={data.currency} /> : <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}
       <section className="monthly-summary" aria-labelledby="bills-title"><h2 id="bills-title">Upcoming bills</h2>
         <p>All household schedules from Actual. Responsibility and autopay are household reminders.</p>
         {data.bills.length === 0 && <p>No schedules configured in Actual yet.</p>}
@@ -54,21 +70,44 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
       </section></>}
   </main>;
 }
+function MonthPicker({ month, currentMonth, onChange }: { month: string; currentMonth: string; onChange: (month: string) => void }) {
+  const date = new Date(month + '-01T00:00:00Z');
+  function move(offset: number) {
+    const next = new Date(date);
+    next.setUTCMonth(next.getUTCMonth() + offset);
+    onChange(next.toISOString().slice(0, 7));
+  }
+  return <nav aria-label="Summary month">
+    <button type="button" aria-label="Previous month" disabled={month === '0001-01'} onClick={() => move(-1)}>←</button>
+    <span aria-live="polite">{new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date)}</span>
+    <button type="button" aria-label="Next month" disabled={month >= currentMonth} onClick={() => move(1)}>→</button>
+    {month !== currentMonth && <button type="button" onClick={() => onChange(currentMonth)}>Back to current month</button>}
+  </nav>;
+}
+function HistoricalTransaction({ row, currency }: { row: Row; currency: string }) {
+  const amount = new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(row.amount / 100);
+  return <article className="review-card"><div className="transaction-heading"><h2>{row.description}</h2><strong className="transaction-amount">{amount}</strong></div>
+    <div className="transaction-meta"><span>{[row.date, row.account, row.categoryName, row.parentId ? 'Actual split item' : null].filter(Boolean).join(' · ')}</span>
+      <span className="review-status">{row.metadata.review_status === 'REVIEWED' ? 'Reviewed' : 'Needs review'} · Read-only</span></div>
+    <p>Expense owner: {row.metadata.expense_owner ?? 'Unclassified'} · Payer: {row.metadata.payer ?? 'Not recorded'}</p>
+    {row.metadata.notes && <p>{row.metadata.notes}</p>}
+  </article>;
+}
 function MonthlyOverview({ data }: { data: Data }) {
   // Recalculate owners from saved rows so successful tagging updates the cards immediately.
   const owners = monthlySummary({ transactions: data.transactions, accounts: [], categories: [] }, data.transactions.map(row => row.metadata), data.summary.through).owners;
   const money = (amount: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency }).format(amount / 100);
-  return <section className="monthly-summary" aria-labelledby="monthly-summary-title">
-    <h2 id="monthly-summary-title">Monthly household spending</h2>
+  return <div>
     <p>{data.summary.from} – {data.summary.through} · UTC <span className="review-status">All household transactions</span></p>
     <p>Spending excludes income, refunds and transfers. Saved owner tags count even when awaiting review. Review filters do not change these totals.</p>
+    {Object.values(owners).some(amount => amount > 0) && members.every(owner => owners[owner] === 0) && <p>No household expense-owner tags recorded for spending this month. All spending is Unclassified.</p>}
     <div className="summary-cards">{([...members, 'UNCLASSIFIED'] as const).map(owner => <article className="review-card" key={owner}>
       <h3>{owner === 'UNCLASSIFIED' ? 'Unclassified' : owner}</h3><strong className="transaction-amount">{money(owners[owner])}</strong>
     </article>)}</div>
     <article className="review-card"><h3>Top categories <span className="review-status">Overall · up to 8</span></h3>
       {data.summary.topCategories.length === 0 ? <p>No spending this month.</p> : <ol className="summary-categories">{data.summary.topCategories.map(category => <li key={category.id ?? 'uncategorized'}><span>{category.name}</span><strong className="transaction-amount">{money(category.amount)}</strong></li>)}</ol>}
     </article>
-  </section>;
+  </div>;
 }
 function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSaved: (m: Metadata) => void }) {
   const advancedId = useId();

@@ -1,5 +1,5 @@
 import { billCards, type Schedule } from '../../../server/bills';
-import { monthlySummary } from '../../../server/monthly-summary';
+import { monthRange, monthlySummary } from '../../../server/monthly-summary';
 import { getActualSummary } from '../../../server/actual';
 import { currentMember, jsonError, privateHeaders } from '../../../server/auth';
 import { householdConfig, readMetadata, saveMetadata, readBills } from '../../../server/db';
@@ -7,16 +7,22 @@ import { categoryName, leaves, payerHint, parseMetadata, type Summary } from '..
 import { sameOrigin } from '../../../server/session';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const member = await currentMember();
     if (!member) return jsonError('Please log in.', 401);
-    const summary = await getActualSummary() as Summary & { schedules?: Schedule[] };
-    const transactions = leaves(summary.transactions);
+    let range;
+    try {
+      const params = new URL(request.url).searchParams;
+      if (params.getAll('month').length > 1) throw new Error('Provide one month.');
+      range = monthRange(params.get('month'));
+    } catch (error) { return jsonError((error as Error).message, 400); }
+    const summary = await getActualSummary(range) as Summary & { schedules?: Schedule[] };
+    const transactions = leaves(summary.transactions).filter(t => t.date >= range.from && t.date <= range.through);
     const config = await householdConfig();
     const metadata = new Map((await readMetadata(transactions.map(t => t.id))).map(m => [m.actual_transaction_id, m]));
     const bills = billCards(summary.schedules, await readBills((summary.schedules ?? []).map(s => s.id)), summary.accounts);
-    return Response.json({ member, ...config, bills, summary: monthlySummary(summary, [...metadata.values()]), transactions: transactions.map(t => {
+    return Response.json({ member, ...config, bills, summary: monthlySummary({ ...summary, transactions }, [...metadata.values()], range.through), transactions: transactions.map(t => {
       const account = summary.accounts.find(a => a.id === t.account)?.name ?? 'Unknown account';
       return { id: t.id, date: t.date, amount: t.amount, transfer_id: t.transfer_id, description: summary.payees?.find(p => p.id === t.payee)?.name || t.notes || 'Transaction', account, categoryName: categoryName(t, summary.categories), parentId: t.parent_id ?? null,
         payerHint: payerHint(account), metadata: metadata.get(t.id) ?? { actual_transaction_id: t.id, expense_owner: null, payer: null, split_rule: null, notes: null, review_status: 'NEEDS_REVIEW' } };
