@@ -17,6 +17,9 @@ button:disabled { opacity: .5; cursor: wait; }
 article { margin: 20px 0; padding: 20px; border: 1px solid #475569; border-radius: 10px; background: #172033; }
 label { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 label.check { flex-direction: row; align-items: center; }
+.owner-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.fields > * { min-width: 0; }
+.fields select { width: 100%; }
 .fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 16px; }
 textarea { min-height: 65px; width: 100%; }
 fieldset { border: 0; padding: 0; min-width: 0; }

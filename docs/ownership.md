@@ -9,9 +9,13 @@ name, including hidden categories, with each split child using its own category.
 Missing or unresolved categories omit the category line.
 
 Each Actual transaction ID maps to one optional `transaction_metadata` row.
-Absent rows display as NEEDS_REVIEW with no owner or payer. A Michael/Liz/Joint
+Absent rows have NEEDS_REVIEW status with no saved owner or payer. A Michael/Liz/Joint
 account prefix suggests the **payer only**; it never determines expense ownership
-or writes metadata on read. Select the expense owner explicitly. “Save for review”
+or writes metadata on read. Select the expense owner explicitly with the MICHAEL / LIZ / JOINT buttons.
+The card prefills an unset payer from the account hint and displays it as read-only
+text. Each card has an Advanced disclosure, closed by default, for overriding the
+payer and, for JOINT owners only, choosing a split rule and viewing its preview.
+Saved payer overrides take precedence over account hints. “Save for review”
 persists the draft as NEEDS_REVIEW; “Confirm and mark reviewed” requires both owner
 and payer and saves REVIEWED. Editing a reviewed row and saving for review reopens
 it. Either spouse can edit all household rows; simultaneous saves use last-write-wins.
