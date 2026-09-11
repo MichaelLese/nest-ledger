@@ -74,8 +74,8 @@ HTTP 503
 `compose restart nest-ledger-web` preserved the PostgreSQL and Actual container
 IDs, start times and named volume assignments, plus hashes of seeded household
 member/settings rows. Neither database nor Actual was restarted by this check.
-This verifies the requested web restart; a full CT reboot/restore drill has not
-been performed.
+This verifies the requested web restart. The isolated artifact restore drill below
+passed on 2026-09-11; a full CT reboot/application recovery has not been tested.
 
 ## Off-CT backups
 
@@ -101,7 +101,8 @@ permitted **permission protection**, not encryption at rest. Do not copy them
 to shared storage without encryption. The same-host agent account and root can
 read them. All daily copies are retained, including weekly/monthly points;
 monitor disk usage and introduce explicit retention before pruning. Proxmox/PBS
-backups and an isolated restore drill remain separate infrastructure follow-up.
+backups remain separate infrastructure follow-up. The isolated artifact restore
+drill below verifies the initial backup format.
 The repository's broader encrypted/PBS backup policy is not fully implemented
 by this initial permission-protected backup.
 
@@ -192,6 +193,154 @@ operator's known budget/account totals without bank synchronization. Recreate
 Serve only after deliberate cutover, using the replacement CT's assigned DNS
 name; the saved JSON is a reference, not a transferable Tailscale identity.
 Never use `down -v` on production.
+
+## Isolated artifact restore drill — 2026-09-11
+
+Ran from agent-hub against the read-only snapshot
+`/home/agent/backups/nest-ledger/20260911T031505Z`, using SSH alias `nest-ledger`
+for Docker on CT 116. Agent-hub has no Docker. This was an artifact restore,
+not a replacement-CT deployment or application/budget validation. No production
+container was modified, stopped, removed or replaced; the only production DB
+access was the read-only Compose/psql SELECT below. No production volume was
+mounted and no production Compose lifecycle command was run.
+
+Results:
+
+| Table | Restored snapshot | Live at drill time |
+| --- | ---: | ---: |
+| household_members | 3 | 3 |
+| transaction_metadata | 0 | 1 |
+| bills | 0 | 0 |
+| split_rules | 1 | 1 |
+| household_settings | 1 | 1 |
+
+The transaction metadata discrepancy is consistent with a post-snapshot change,
+but row counts alone do not prove its cause or row-level equivalence. No live
+row contents were read. `pg_restore --list` reported 31 TOC entries, custom
+format 1.16-0, source PostgreSQL/pg_dump 17.11, created 03:15:06 UTC.
+`pg_restore --exit-on-error --single-transaction` exited 0 using the native
+`nest_ledger` role/database, with no migration or ownership override needed.
+The drill's `postgres:17` resolved to PostgreSQL 17.11 on Debian 13, image digest
+`sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675`;
+production's dump came from Debian 12. The image was pulled and remains cached;
+no image pruning was performed.
+
+All four entries in `SHA256SUMS` passed before and after the drill. Input sizes
+were `postgres.dump` 12,996 bytes, `actual-data.tar.gz` 340,600 bytes,
+`config.tar.gz` 28,812 bytes and `tailscale-serve.json` 407 bytes. SHA256SUMS
+contains archive hashes, **not extracted-file sizes**: extracted sizes and bytes
+were separately compared with the checksum-verified tar members. The structure
+was `server-files/account.sqlite` (69,632 bytes), two files under `user-files/`
+(a SQLite file of 2,134,016 bytes and a blob of 27,293 bytes), and `.migrate`
+(861 bytes). All four matched. File contents and configuration secrets were
+not printed or committed.
+
+### Commands executed
+
+The following records the successful commands, grouped by operation. Run local
+commands in Bash on agent-hub; remote heredocs execute on CT 116. The production
+replacement procedure above is **not** the procedure for a drill on live CT 116.
+
+```sh
+set -euo pipefail
+snapshot=/home/agent/backups/nest-ledger/20260911T031505Z
+# Read-only resource inventory; repeat after teardown.
+ssh -o BatchMode=yes nest-ledger 'docker ps -a --format "{{.Names}}"; docker volume ls --format "{{.Name}}"; docker network ls --format "{{.Name}}"'
+(cd "$snapshot" && sha256sum -c SHA256SUMS &&
+ stat -c '%n %s bytes' postgres.dump actual-data.tar.gz config.tar.gz tailscale-serve.json &&
+ tar -tzvf actual-data.tar.gz)
+
+ssh -o BatchMode=yes nest-ledger 'bash -se' <<'REMOTE'
+set -euo pipefail
+if docker container inspect nest-ledger-drill-pg >/dev/null 2>&1; then
+  echo 'Drill name already exists; aborting without changes' >&2; exit 1
+fi
+docker run -d --name nest-ledger-drill-pg --network none \
+  --memory 512m --cpus 1 \
+  --tmpfs /var/lib/postgresql/data:rw,size=384m \
+  -e POSTGRES_DB=nest_ledger -e POSTGRES_USER=nest_ledger \
+  -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17
+ready=false
+for attempt in $(seq 1 60); do
+  if docker exec nest-ledger-drill-pg pg_isready -U nest_ledger -d nest_ledger >/dev/null; then ready=true; break; fi
+  sleep 1
+done
+"$ready"
+docker inspect nest-ledger-drill-pg --format 'network={{.HostConfig.NetworkMode}} mounts={{json .Mounts}} compose_project={{index .Config.Labels "com.docker.compose.project"}}'
+REMOTE
+
+ssh -o BatchMode=yes nest-ledger 'docker exec -i nest-ledger-drill-pg pg_restore --list' < "$snapshot/postgres.dump"
+ssh -o BatchMode=yes nest-ledger 'docker exec -i nest-ledger-drill-pg pg_restore -U nest_ledger -d nest_ledger --exit-on-error --single-transaction' < "$snapshot/postgres.dump"
+sql="SELECT 'household_members' AS table_name, count(*) FROM household_members UNION ALL SELECT 'transaction_metadata', count(*) FROM transaction_metadata UNION ALL SELECT 'bills', count(*) FROM bills UNION ALL SELECT 'split_rules', count(*) FROM split_rules UNION ALL SELECT 'household_settings', count(*) FROM household_settings;"
+printf '%s\n' "$sql" | ssh -o BatchMode=yes nest-ledger 'docker exec -i nest-ledger-drill-pg psql -X -U nest_ledger -d nest_ledger -v ON_ERROR_STOP=1'
+printf '%s\n' "$sql" | ssh -o BatchMode=yes nest-ledger 'cd /opt/nest-ledger && docker compose --env-file infrastructure/.env -f infrastructure/compose.yaml exec -T postgres sh -c '\''PGOPTIONS="-c default_transaction_read_only=on" psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'\'''
+ssh -o BatchMode=yes nest-ledger 'docker exec nest-ledger-drill-pg postgres --version'
+```
+
+Inspection returned `network=none mounts=[] compose_project=`. Explicit tmpfs at
+PGDATA prevents an anonymous Docker volume; no network or volume was created.
+Trust authentication is only for this disposable, network-disabled container
+with no published ports. Do not use that setting for production.
+
+Actual extraction ran locally on agent-hub, under a fresh mode-700 directory
+`/tmp/nest-ledger__drill-q7nmetd6`, with Python's safe data extraction filter:
+
+```sh
+python3 - <<'PYTHON'
+import pathlib, tarfile, tempfile, shutil
+source=pathlib.Path('/home/agent/backups/nest-ledger/20260911T031505Z/actual-data.tar.gz')
+root=pathlib.Path(tempfile.mkdtemp(prefix='nest-ledger__drill-', dir='/tmp'))
+try:
+    with tarfile.open(source, 'r:gz') as archive:
+        members=archive.getmembers()
+        assert all((m.isdir() or m.isfile()) and not pathlib.PurePosixPath(m.name).is_absolute() and '..' not in pathlib.PurePosixPath(m.name).parts for m in members)
+        archive.extractall(root, filter='data')
+        for m in members:
+            if m.isfile():
+                p=root/m.name
+                assert p.stat().st_size == m.size
+                assert p.read_bytes() == archive.extractfile(m).read()
+        assert (root/'server-files').is_dir() and (root/'user-files').is_dir()
+        for folder in ['server-files','user-files']:
+            sizes=sorted(p.stat().st_size for p in (root/folder).iterdir() if p.is_file())
+            print(f'{folder}/: file sizes {sizes} bytes')
+        print(f'.migrate: {(root/".migrate").stat().st_size} bytes')
+        print('All 4 extracted files match archive sizes and bytes; archive checksum previously passed.')
+finally:
+    shutil.rmtree(root)
+    print(f'Removed {root}; absent={not root.exists()}')
+PYTHON
+
+ssh -o BatchMode=yes nest-ledger 'docker rm -f nest-ledger-drill-pg && docker ps -a --format "{{.Names}}" && docker volume ls --format "{{.Name}}" && docker network ls --format "{{.Name}}"'
+(cd "$snapshot" && sha256sum -c SHA256SUMS)
+```
+
+Teardown exited 0; the extraction directory reported `absent=True`. Post-drill
+container, volume and network name inventories matched preflight, with no drill
+objects left. `nest-ledger-drill-net` was never created, so no network removal
+was needed. Input files were never written.
+
+### Limitations and fragile steps
+
+- The earlier replacement-CT instructions use production Compose names and
+  volume mounts; they must remain confined to a fresh replacement CT. The
+  commands above provide the verified alternative for live-host isolation.
+- Agent-hub cannot run Docker locally; SSH stdin streaming into containerized
+  PostgreSQL tools worked without copying the dump onto CT storage.
+- The 384 MB tmpfs and 512 MB memory limit fit this small snapshot, not an
+  arbitrary future dataset. Reassess capacity for larger backups. `postgres:17`
+  is a moving tag; the resolved version/digest above records this run.
+- Cleanup was explicit across SSH calls, not a persistent remote exit trap. If
+  interrupted after creation, inspect the exact drill name and remove only the
+  task-owned `nest-ledger-drill-pg`; also remove the recorded local extraction
+  directory if Python's `finally` could not run. Never prune shared Docker state.
+- Python must support `tarfile`'s `filter='data'`; byte comparison reads each file
+  into memory. The test validates archive extraction, not SQLite integrity,
+  Actual login, budget totals, synchronization or restored application startup.
+- Config checksum passed but config was not extracted. Tailscale cutover, full
+  CT recovery, web health after restore, and a real-data financial reconciliation
+  remain untested. No merge, deployment, bank sync or production restart was
+  part of this drill.
 
 ## Exact operator next action
 
