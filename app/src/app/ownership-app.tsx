@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { allocate, members, type Member, type Metadata, type SplitRule } from '../server/ownership';
 import { monthlySummary, type MonthlySummary } from '../server/monthly-summary';
-import type { BillCard, BillMetadata } from '../server/bills';
+import { billDueStatus, type BillCard, type BillMetadata } from '../server/bills';
 import type { LoginMember } from '../server/session';
 type Row = { transfer_id?: string | null; id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
 type Data = { bills: BillCard[]; summary: MonthlySummary; rules: SplitRule[]; defaultSplit: string | null; currency: string; transactions: Row[] };
@@ -112,6 +112,9 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
 }
 
 function BillEditor({ row, currency, onSaved }: { row: BillCard; currency: string; onSaved: (m: BillMetadata) => void }) {
+  const responsibilityButton = useRef<HTMLButtonElement>(null);
+  const due = billDueStatus(row.next_date);
+  const money = (amount: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount / 100);
   const [draft, setDraft] = useState<BillMetadata>(row);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -126,14 +129,19 @@ function BillEditor({ row, currency, onSaved }: { row: BillCard; currency: strin
   }
   return <article className="review-card bill-card" aria-label={row.name}>
     <div className="transaction-heading"><h3>{row.name}</h3>
-      {row.amount !== null && <strong className="transaction-amount">{new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(row.amount / 100)}</strong>}
+      {row.amount !== null && <strong className="transaction-amount">{money(Math.abs(row.amount))}</strong>}
     </div>
     <div className="transaction-meta"><span>{row.next_date ? `Next date: ${row.next_date}` : 'No next date available'}</span>
       <span>{row.amount === null ? 'No fixed amount available' : 'Schedule amount'}</span>
-      {!row.responsible_person && <span>Responsibility not set</span>}
+      {due && <span className={`review-status ${due.kind}`}>{due.label}</span>}
+      <span className={`review-status${draft.autopay ? ' reviewed' : ''}`}>{draft.autopay ? '✓ Autopay' : 'Autopay off'}</span>
     </div>
+    <div className="bill-responsibility"><span>Who pays · Responsible person</span>
+      {draft.responsible_person ? <strong className="bill-owner-chip">{draft.responsible_person}</strong> : <button className="bill-unassigned" type="button" disabled={busy} onClick={() => responsibilityButton.current?.focus()}>Unassigned <span aria-hidden="true">→</span><span className="sr-only">: choose a responsible person</span></button>}
+    </div>
+    <p className="bill-source">{row.payingAccount ? `Paying account: ${row.payingAccount}` : 'Source: Actual schedule · Paying account unavailable'}</p>
     <fieldset disabled={busy}><div className="ownership-controls">
-      <div className="owner-control" role="group" aria-label="Responsible person"><span>Responsible person</span><div className="owner-buttons">{members.map(person => <button type="button" key={person} aria-pressed={draft.responsible_person === person} onClick={() => setDraft({ ...draft, responsible_person: person })}>{person}</button>)}</div></div>
+      <div className="owner-control" role="group" aria-label="Responsible person"><span>Responsible person</span><div className="owner-buttons">{members.map(person => <button type="button" key={person} ref={person === members[0] ? responsibilityButton : undefined} aria-pressed={draft.responsible_person === person} onClick={() => setDraft({ ...draft, responsible_person: person })}>{person}</button>)}</div></div>
       <label className="check"><input type="checkbox" checked={draft.autopay} onChange={e => setDraft({ ...draft, autopay: e.target.checked })} />Autopay</label>
       <div className="actions"><button type="button" onClick={save}>{busy ? 'Saving…' : 'Save'}</button></div>
     </div></fieldset>
