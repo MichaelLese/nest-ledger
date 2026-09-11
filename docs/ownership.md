@@ -6,7 +6,8 @@ are not included in this phase. No Actual mutation or bank-sync calls are added.
 The existing read downloads a temporary Actual budget; it now also reads payee
 names for transaction identification. Review cards also show the Actual category
 name, including hidden categories, with each split child using its own category.
-Missing or unresolved categories omit the category line.
+Date, account, and any resolved category share one muted metadata line alongside
+a compact review-status badge. Missing or unresolved categories are omitted.
 
 Each Actual transaction ID maps to one optional `transaction_metadata` row.
 Absent rows have NEEDS_REVIEW status with no saved owner or payer. A Michael/Liz/Joint
@@ -14,7 +15,11 @@ account prefix suggests the **payer only**; it never determines expense ownershi
 or writes metadata on read. Select the expense owner explicitly with the MICHAEL / LIZ / JOINT buttons.
 The card prefills an unset payer from the account hint and displays it as read-only
 text. Each card has an Advanced disclosure, closed by default, for overriding the
-payer and, for JOINT owners only, choosing a split rule and viewing its preview.
+payer, editing household notes, and, for JOINT owners only, choosing a split rule
+and viewing its preview. The account-name payer hint also appears inside Advanced.
+On desktop, the compact header keeps the amount beside the description and a
+secondary Advanced button; expense-owner buttons and the payer share a row.
+Narrow screens retain larger controls and stack the owner label above its buttons.
 Saved payer overrides take precedence over account hints. “Save for review”
 persists the draft as NEEDS_REVIEW; “Confirm and mark reviewed” requires both owner
 and payer and saves REVIEWED. Editing a reviewed row and saving for review reopens

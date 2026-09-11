@@ -62,22 +62,27 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
     catch (e) { setMessage((e as Error).message); }
     finally { setBusy(false); }
   }
-  return <article><div className="transaction-heading"><div><h2>{row.description}</h2><p>{row.date} · {row.account}{row.parentId ? ' · Actual split item' : ''}</p>{row.categoryName && <p>{row.categoryName}</p>}</div><strong>{money(row.amount)}</strong></div>
-    <p className="status">{row.metadata.review_status === 'REVIEWED' ? 'Reviewed' : 'Needs review'}</p>
-    <fieldset disabled={busy}><div className="fields">
-      <div role="group" aria-label="Expense owner"><p>Expense owner</p><div className="owner-buttons">{members.map(owner => <button type="button" key={owner} aria-pressed={draft.expense_owner === owner} onClick={() => {
+  return <article className="review-card"><div className="transaction-heading">
+    <h2>{row.description}</h2><div className="transaction-header-controls"><strong className="transaction-amount">{money(row.amount)}</strong>
+      <button className="advanced-toggle" type="button" disabled={busy} aria-expanded={advanced} aria-controls={advancedId} onClick={() => setAdvanced(!advanced)}>Advanced</button>
+    </div></div>
+    <div className="transaction-meta"><span>{[row.date, row.account, row.categoryName, row.parentId ? 'Actual split item' : null].filter(Boolean).join(' · ')}</span>
+      <span className={`review-status${row.metadata.review_status === 'REVIEWED' ? ' reviewed' : ''}`}>{row.metadata.review_status === 'REVIEWED' ? 'Reviewed' : 'Needs review'}</span>
+    </div>
+    <fieldset disabled={busy}><div className="ownership-controls">
+      <div className="owner-control" role="group" aria-label="Expense owner"><span>Expense owner</span><div className="owner-buttons">{members.map(owner => <button type="button" key={owner} aria-pressed={draft.expense_owner === owner} onClick={() => {
         setDraft({ ...draft, expense_owner: owner, split_rule: owner === 'JOINT' ? (draft.expense_owner === 'JOINT' ? draft.split_rule : data.defaultSplit) : null });
       }}>{owner}</button>)}</div></div>
-      <div><p>Payer: <strong>{draft.payer ?? 'Not set'}</strong></p>{!draft.payer && <p>Choose a payer in Advanced before confirming review.</p>}</div>
+      <span className="payer-summary">Payer: <strong>{draft.payer ?? 'Not set'}</strong></span>
     </div>
-    {!row.metadata.payer && row.payerHint && <p>Payer hint: {row.payerHint}, from the account name. Verify before saving.</p>}
-    <button type="button" aria-expanded={advanced} aria-controls={advancedId} onClick={() => setAdvanced(!advanced)}>Advanced</button>
-    <div id={advancedId} hidden={!advanced}>
+    {!draft.payer && <p>Choose a payer in Advanced before confirming review.</p>}
+    <div className="advanced-fields" id={advancedId} hidden={!advanced}>
+      {!row.metadata.payer && row.payerHint && <p>Payer hint: {row.payerHint}, from the account name. Verify before saving.</p>}
       <div className="fields"><label>Payer override<select value={draft.payer ?? ''} onChange={e => setDraft({ ...draft, payer: (e.target.value || null) as Member | null })}><option value="">Choose payer</option>{members.map(m => <option key={m}>{m}</option>)}</select></label>
       {draft.expense_owner === 'JOINT' && <label>Joint split<select value={draft.split_rule ?? ''} onChange={e => setDraft({ ...draft, split_rule: e.target.value || null })}><option value="">Choose split</option>{data.rules.map(r => <option key={r.id} value={r.id}>{r.name} (Michael {r.me_percentage}% / Liz {r.wife_percentage}%)</option>)}</select></label>}</div>
       {split && <p>Split preview: Michael {money(split.MICHAEL)} · Liz {money(split.LIZ)}. Applies to this transaction only.</p>}
+      <label>Household notes<textarea maxLength={2000} value={draft.notes ?? ''} onChange={e => setDraft({ ...draft, notes: e.target.value || null })} /></label>
     </div>
-    <label>Household notes<textarea maxLength={2000} value={draft.notes ?? ''} onChange={e => setDraft({ ...draft, notes: e.target.value || null })} /></label>
     <div className="actions"><button onClick={() => save('NEEDS_REVIEW')}>Save for review</button><button className="primary" disabled={!draft.expense_owner || !draft.payer || (draft.expense_owner === 'JOINT' && !draft.split_rule)} onClick={() => save('REVIEWED')}>Confirm and mark reviewed</button></div></fieldset>
     {message && <p role="status">{message}</p>}
   </article>;
