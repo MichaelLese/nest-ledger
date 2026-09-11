@@ -157,10 +157,13 @@ recurrence dates or completion filter are added.
 The pinned SDK also exposes `account`, passed unchanged through the summary
 worker. Bills resolve that ID against summary accounts to display the paying
 account name; missing or unresolved IDs show “Source: Actual schedule · Paying
-account unavailable”. Account names never assign responsibility. Cards show the
-selected responsible member as a chip, or a muted “Unassigned” button that focuses
-the responsibility choices, plus an always-visible autopay status pill. Selection
-changes remain drafts until Save succeeds.
+account unavailable”. Account names never assign responsibility. Assigned cards
+load in display mode with the saved responsible member as a chip
+and an autopay status pill. Edit opens the responsibility choices, autopay checkbox,
+and Save button. Unassigned cards initially open in edit mode to make assignment
+obvious. Successful saves return to display mode with updated values and an Edit
+button; Save appears only in edit mode. Saving without assigning a member shows a
+muted “Unassigned” chip. Selection changes remain drafts until Save succeeds.
 
 Each card saves responsibility (MICHAEL/LIZ/JOINT) and an autopay reminder through
 `PUT /api/ownership/bills`, with the existing session and origin checks. The server
