@@ -72,6 +72,5 @@ button.advanced-toggle:hover { background: #334155; color: #e2e8f0; }
 .bill-responsibility { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .bill-responsibility > span { color: #cbd5e1; font-size: .85rem; }
 .bill-owner-chip { border: 1px solid #5eead4; border-radius: 6px; padding: 6px 10px; background: #0f766e; color: #f8fafc; font-size: .85rem; }
-button.bill-unassigned { color: #94a3b8; border-style: dashed; background: transparent; }
-button.bill-unassigned:hover { color: #e2e8f0; background: #334155; }
+.bill-owner-chip.bill-unassigned { color: #94a3b8; border-color: #94a3b8; border-style: dashed; background: transparent; }
 .bill-card .bill-source { color: #94a3b8; font-size: .85rem; }
