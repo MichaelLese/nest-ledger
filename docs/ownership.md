@@ -1,8 +1,10 @@
 # Phase 4 ownership workflow
 
 Actual remains the only ledger. The home page provides transaction tagging and a
-review queue for the **current UTC calendar month through today**. Older dates
-are not included in this phase. No Actual mutation or bank-sync calls are added.
+review queue for the **selected UTC calendar month**. The current month runs
+through today; historical months cover the full calendar month. The month picker
+retains its current-month upper limit. All months use the same transaction editor
+and Save for review / Confirm and mark reviewed flow. No Actual mutation or bank-sync calls are added.
 The existing read downloads a temporary Actual budget; it now also reads payee
 names for transaction identification. Review cards also show the Actual category
 name, including hidden categories, with each split child using its own category.
@@ -101,14 +103,14 @@ still needs to check:
 - Desktop and narrow mobile layout, keyboard navigation, readable labels, loading,
   empty/error states, and retention of an unsaved draft after a failed save.
 - Real Actual payee/account/date/amount display and split child rows, with no
-  parent duplication. Confirm only the current month appears.
+  parent duplication. Confirm month navigation and historical save/confirm persistence.
 - A paying-account hint never sets the expense owner or resolves review. Save
   differing owner/payer values, refresh, confirm review, then reopen it.
 - All four global filters and the review-only toggle; unknown owners remain in ALL.
 - JOINT 50/50 preview, odd-cent/refund rounding, personal owner clearing the rule,
   and persistence across app restart. Verify Actual transaction data is unchanged.
 
-Reconciliation, backups, historical browsing, rule editing, OIDC and
+Reconciliation, backups, rule editing, OIDC and
 infrastructure work remain outside this implementation. Phase 5 bills are
 described below.
 
@@ -122,7 +124,7 @@ read and metadata query; no additional ledger or database writes are introduced.
 Amounts are positive integer Actual minor units representing **gross spending**:
 negative leaf transactions only, excluding linked transfers (`transfer_id`).
 Income, refunds, and zero amounts are excluded rather than netted against spend.
-The range is the current UTC calendar month through today, inclusive.
+The range is the selected UTC calendar month, inclusive, ending today for the current month.
 
 Saved expense ownership determines the bucket regardless of review status;
 missing/null owners are Unclassified. Account names and payer tags never assign

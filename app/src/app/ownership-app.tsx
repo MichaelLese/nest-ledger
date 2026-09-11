@@ -49,7 +49,7 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   return <main><header><div><h1>Transaction ownership</h1><p>Signed in as {member}</p></div><button onClick={async () => {
     try { await api('/api/auth/logout', 'POST'); window.location.reload(); } catch (e) { setError((e as Error).message); }
   }}>Sign out</button></header>
-    <p>{historical ? 'Historical UTC month. Transaction cards are read-only.' : 'Current UTC month through today. Confirm who owns each expense and who paid it. Account hints need your confirmation.'}</p>
+    <p>{historical ? 'Historical UTC month. Confirm who owns each expense and who paid it. Account hints need your confirmation.' : 'Current UTC month through today. Confirm who owns each expense and who paid it. Account hints need your confirmation.'}</p>
     <nav aria-label="Expense owner filter">{(['ALL', ...members] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value}</button>)}</nav>
     <div className="toolbar"><label className="check"><input type="checkbox" checked={queue} onChange={e => setQueue(e.target.checked)} />Needs review only</label><button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</button></div>
     <p>Filters use confirmed expense ownership. Untagged transactions appear under ALL.</p>
@@ -62,7 +62,7 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
     </section>
     {data && <><p role="status">{shown.length} transactions shown · {data.transactions.filter(t => t.metadata.review_status === 'NEEDS_REVIEW').length} need review this month</p>
       {shown.length === 0 && <p>No transactions match this view.</p>}
-      {shown.map(row => historical ? <HistoricalTransaction key={row.id} row={row} currency={data.currency} /> : <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}
+      {shown.map(row => <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}
       <section className="monthly-summary" aria-labelledby="bills-title"><h2 id="bills-title">Upcoming bills</h2>
         <p>All household schedules from Actual. Responsibility and autopay are household reminders.</p>
         {data.bills.length === 0 && <p>No schedules configured in Actual yet.</p>}
@@ -83,15 +83,6 @@ function MonthPicker({ month, currentMonth, onChange }: { month: string; current
     <button type="button" aria-label="Next month" disabled={month >= currentMonth} onClick={() => move(1)}>→</button>
     {month !== currentMonth && <button type="button" onClick={() => onChange(currentMonth)}>Back to current month</button>}
   </nav>;
-}
-function HistoricalTransaction({ row, currency }: { row: Row; currency: string }) {
-  const amount = new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(row.amount / 100);
-  return <article className="review-card"><div className="transaction-heading"><h2>{row.description}</h2><strong className="transaction-amount">{amount}</strong></div>
-    <div className="transaction-meta"><span>{[row.date, row.account, row.categoryName, row.parentId ? 'Actual split item' : null].filter(Boolean).join(' · ')}</span>
-      <span className="review-status">{row.metadata.review_status === 'REVIEWED' ? 'Reviewed' : 'Needs review'} · Read-only</span></div>
-    <p>Expense owner: {row.metadata.expense_owner ?? 'Unclassified'} · Payer: {row.metadata.payer ?? 'Not recorded'}</p>
-    {row.metadata.notes && <p>{row.metadata.notes}</p>}
-  </article>;
 }
 function MonthlyOverview({ data }: { data: Data }) {
   // Recalculate owners from saved rows so successful tagging updates the cards immediately.
@@ -121,7 +112,7 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
   const split = draft.expense_owner === 'JOINT' && rule ? allocate(row.amount, rule) : null;
   async function save(review_status: Metadata['review_status']) {
     setBusy(true); setMessage('');
-    try { const result = await api('/api/ownership', 'PUT', { ...draft, review_status }); onSaved(result.metadata); setMessage(review_status === 'REVIEWED' ? 'Review confirmed.' : 'Saved for review.'); }
+    try { const result = await api(`/api/ownership?month=${data.summary.from.slice(0, 7)}`, 'PUT', { ...draft, review_status }); onSaved(result.metadata); setMessage(review_status === 'REVIEWED' ? 'Review confirmed.' : 'Saved for review.'); }
     catch (e) { setMessage((e as Error).message); }
     finally { setBusy(false); }
   }

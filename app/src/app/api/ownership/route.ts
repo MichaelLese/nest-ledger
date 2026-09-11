@@ -1,6 +1,6 @@
 import { billCards, type Schedule } from '../../../server/bills';
 import { monthRange, monthlySummary } from '../../../server/monthly-summary';
-import { getActualSummary } from '../../../server/actual';
+import { getActualSummary, type ActualDateRange } from '../../../server/actual';
 import { currentMember, jsonError, privateHeaders } from '../../../server/auth';
 import { householdConfig, readMetadata, saveMetadata, readBills } from '../../../server/db';
 import { categoryName, leaves, payerHint, parseMetadata, type Summary } from '../../../server/ownership';
@@ -34,12 +34,18 @@ export async function PUT(request: Request) {
   try {
     if (!await currentMember()) return jsonError('Please log in.', 401);
     if (Number(request.headers.get('content-length')) > 8192) return jsonError('Request too large.', 413);
+    let range: ActualDateRange | undefined;
+    try {
+      const params = new URL(request.url).searchParams;
+      if (params.getAll('month').length > 1) throw new Error('Provide one month.');
+      if (params.has('month')) range = monthRange(params.get('month'));
+    } catch (error) { return jsonError((error as Error).message, 400); }
     const config = await householdConfig();
     let metadata;
     try { metadata = parseMetadata(await request.json(), config.rules); }
     catch (error) { return jsonError(error instanceof Error ? error.message : 'Invalid metadata.', 400); }
-    const summary = await getActualSummary() as Summary;
-    if (!leaves(summary.transactions).some(t => t.id === metadata.actual_transaction_id)) return jsonError('Transaction is no longer in the current month. Refresh the list.', 409);
+    const summary = await getActualSummary(range) as Summary;
+    if (!leaves(summary.transactions).some(t => t.id === metadata.actual_transaction_id && (!range || t.date >= range.from && t.date <= range.through))) return jsonError(range ? 'Transaction is no longer in the selected month. Refresh the list.' : 'Transaction is no longer in the current month. Refresh the list.', 409);
     await saveMetadata(metadata);
     return Response.json({ metadata }, { headers: privateHeaders });
   } catch { return jsonError('Unable to save metadata. Check Actual and household database configuration.', 503); }
