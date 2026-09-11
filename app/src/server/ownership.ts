@@ -2,7 +2,7 @@ export const members = ['MICHAEL', 'LIZ', 'JOINT'] as const;
 export type Member = typeof members[number];
 export type Metadata = { actual_transaction_id: string; expense_owner: Member | null; payer: Member | null; split_rule: string | null; notes: string | null; review_status: 'NEEDS_REVIEW' | 'REVIEWED' };
 export type SplitRule = { id: string; name: string; me_percentage: string; wife_percentage: string };
-export type Transaction = { id: string; account: string; date: string; amount: number; payee?: string; category?: string | null; notes?: string; is_parent?: boolean; parent_id?: string; subtransactions?: Transaction[] };
+export type Transaction = { id: string; account: string; date: string; amount: number; payee?: string; transfer_id?: string | null; category?: string | null; notes?: string; is_parent?: boolean; parent_id?: string; subtransactions?: Transaction[] };
 export type Summary = { categories: { id: string; name: string; hidden?: boolean }[]; payees?: { id: string; name: string }[]; accounts: { id: string; name: string }[]; transactions: Transaction[] };
 export function categoryName(transaction: Transaction, categories: Summary['categories']): string | null {
   return categories.find(category => category.id === transaction.category)?.name || null;

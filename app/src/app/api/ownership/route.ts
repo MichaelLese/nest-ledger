@@ -1,3 +1,4 @@
+import { monthlySummary } from '../../../server/monthly-summary';
 import { getActualSummary } from '../../../server/actual';
 import { currentMember, jsonError, privateHeaders } from '../../../server/auth';
 import { householdConfig, readMetadata, saveMetadata } from '../../../server/db';
@@ -13,9 +14,9 @@ export async function GET() {
     const transactions = leaves(summary.transactions);
     const config = await householdConfig();
     const metadata = new Map((await readMetadata(transactions.map(t => t.id))).map(m => [m.actual_transaction_id, m]));
-    return Response.json({ member, ...config, transactions: transactions.map(t => {
+    return Response.json({ member, ...config, summary: monthlySummary(summary, [...metadata.values()]), transactions: transactions.map(t => {
       const account = summary.accounts.find(a => a.id === t.account)?.name ?? 'Unknown account';
-      return { id: t.id, date: t.date, amount: t.amount, description: summary.payees?.find(p => p.id === t.payee)?.name || t.notes || 'Transaction', account, categoryName: categoryName(t, summary.categories), parentId: t.parent_id ?? null,
+      return { id: t.id, date: t.date, amount: t.amount, transfer_id: t.transfer_id, description: summary.payees?.find(p => p.id === t.payee)?.name || t.notes || 'Transaction', account, categoryName: categoryName(t, summary.categories), parentId: t.parent_id ?? null,
         payerHint: payerHint(account), metadata: metadata.get(t.id) ?? { actual_transaction_id: t.id, expense_owner: null, payer: null, split_rule: null, notes: null, review_status: 'NEEDS_REVIEW' } };
     }) }, { headers: privateHeaders });
   } catch { return jsonError('Unable to load transactions. Check Actual and household database configuration.', 503); }
