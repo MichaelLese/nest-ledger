@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { allocate, members, type Member, type Metadata, type SplitRule } from '../server/ownership';
 import type { LoginMember } from '../server/session';
-type Row = { id: string; date: string; amount: number; description: string; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
+type Row = { id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
 type Data = { rules: SplitRule[]; defaultSplit: string | null; currency: string; transactions: Row[] };
 async function api(path: string, method = 'GET', body?: unknown) {
   const response = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
@@ -60,7 +60,7 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
     catch (e) { setMessage((e as Error).message); }
     finally { setBusy(false); }
   }
-  return <article><div className="transaction-heading"><div><h2>{row.description}</h2><p>{row.date} · {row.account}{row.parentId ? ' · Actual split item' : ''}</p></div><strong>{money(row.amount)}</strong></div>
+  return <article><div className="transaction-heading"><div><h2>{row.description}</h2><p>{row.date} · {row.account}{row.parentId ? ' · Actual split item' : ''}</p>{row.categoryName && <p>{row.categoryName}</p>}</div><strong>{money(row.amount)}</strong></div>
     <p className="status">{row.metadata.review_status === 'REVIEWED' ? 'Reviewed' : 'Needs review'}</p>
     <fieldset disabled={busy}><div className="fields"><label>Expense owner<select value={draft.expense_owner ?? ''} onChange={e => {
       const owner = (e.target.value || null) as Member | null;

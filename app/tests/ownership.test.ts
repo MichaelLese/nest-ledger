@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { scryptSync, createHmac } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
-import { allocate, leaves, payerHint, parseMetadata, type Metadata } from '../src/server/ownership';
+import { categoryName, allocate, leaves, payerHint, parseMetadata, type Metadata } from '../src/server/ownership';
 import { checkPassword, sameOrigin, signSession, verifySession } from '../src/server/session';
 import { db, householdConfig, readMetadata, saveMetadata } from '../src/server/db';
 const rule = { id: 'test-rule', name: '50/50', me_percentage: '50.00', wife_percentage: '50.00' };
@@ -30,6 +30,31 @@ test('Actual split children are individually tagged with no parent double count'
   const parent = { ...child, id: 'parent', is_parent: true, subtransactions: [child] };
   assert.deepEqual(leaves([parent, child]).map(t => t.id), ['child']);
   assert.equal(leaves([parent])[0].amount, -100);
+});
+test('category names resolve by Actual category ID, including hidden categories', () => {
+  const transaction = { id: 't', account: 'a', date: '2026-09-01', amount: -100 };
+  const categories = [{ id: 'food', name: 'Groceries' }, { id: 'old', name: 'Archived expense', hidden: true }];
+  assert.equal(categoryName({ ...transaction, category: 'food' }, categories), 'Groceries');
+  assert.equal(categoryName({ ...transaction, category: 'old' }, categories), 'Archived expense');
+  for (const category of [undefined, null, '', 'unknown']) {
+    assert.equal(categoryName({ ...transaction, category }, categories), null);
+  }
+  assert.equal(categoryName({ ...transaction, category: 'food' }, []), null);
+});
+test('split children display their own categories with no parent duplication', () => {
+  const transaction = { account: 'a', date: '2026-09-01', amount: -100 };
+  const children = [
+    { ...transaction, id: 'food-child', parent_id: 'parent', category: 'food' },
+    { ...transaction, id: 'home-child', parent_id: 'parent', category: 'home' },
+    { ...transaction, id: 'uncategorized-child', parent_id: 'parent', category: null },
+  ];
+  const parent = { ...transaction, id: 'parent', is_parent: true, category: null, subtransactions: children };
+  const categories = [{ id: 'food', name: 'Groceries' }, { id: 'home', name: 'Household', hidden: true }];
+  for (const transactions of [[parent], [parent, ...children], children]) {
+    assert.deepEqual(leaves(transactions).map(t => [t.id, categoryName(t, categories)]), [
+      ['food-child', 'Groceries'], ['home-child', 'Household'], ['uncategorized-child', null],
+    ]);
+  }
 });
 test('sessions reject tampering, expiration, wrong secrets and JOINT identity', () => {
   process.env.AUTH_SESSION_SECRET = 'a'.repeat(32);

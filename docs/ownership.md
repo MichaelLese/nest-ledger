@@ -4,7 +4,9 @@ Actual remains the only ledger. The home page provides transaction tagging and a
 review queue for the **current UTC calendar month through today**. Older dates
 are not included in this phase. No Actual mutation or bank-sync calls are added.
 The existing read downloads a temporary Actual budget; it now also reads payee
-names for transaction identification.
+names for transaction identification. Review cards also show the Actual category
+name, including hidden categories, with each split child using its own category.
+Missing or unresolved categories omit the category line.
 
 Each Actual transaction ID maps to one optional `transaction_metadata` row.
 Absent rows display as NEEDS_REVIEW with no owner or payer. A Michael/Liz/Joint
