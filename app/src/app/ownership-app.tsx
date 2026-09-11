@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { allocate, members, type Member, type Metadata, type SplitRule } from '../server/ownership';
 import type { LoginMember } from '../server/session';
 type Row = { id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
@@ -47,6 +47,8 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   </main>;
 }
 function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSaved: (m: Metadata) => void }) {
+  const advancedId = useId();
+  const [advanced, setAdvanced] = useState(false);
   const [draft, setDraft] = useState<Metadata>({ ...row.metadata, payer: row.metadata.payer ?? row.payerHint });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -62,14 +64,19 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
   }
   return <article><div className="transaction-heading"><div><h2>{row.description}</h2><p>{row.date} · {row.account}{row.parentId ? ' · Actual split item' : ''}</p>{row.categoryName && <p>{row.categoryName}</p>}</div><strong>{money(row.amount)}</strong></div>
     <p className="status">{row.metadata.review_status === 'REVIEWED' ? 'Reviewed' : 'Needs review'}</p>
-    <fieldset disabled={busy}><div className="fields"><label>Expense owner<select value={draft.expense_owner ?? ''} onChange={e => {
-      const owner = (e.target.value || null) as Member | null;
-      setDraft({ ...draft, expense_owner: owner, split_rule: owner === 'JOINT' ? data.defaultSplit : null });
-    }}><option value="">Choose owner</option>{members.map(m => <option key={m}>{m}</option>)}</select></label>
-    <label>Payer<select value={draft.payer ?? ''} onChange={e => setDraft({ ...draft, payer: (e.target.value || null) as Member | null })}><option value="">Choose payer</option>{members.map(m => <option key={m}>{m}</option>)}</select></label>
-    {draft.expense_owner === 'JOINT' && <label>Joint split<select value={draft.split_rule ?? ''} onChange={e => setDraft({ ...draft, split_rule: e.target.value || null })}><option value="">Choose split</option>{data.rules.map(r => <option key={r.id} value={r.id}>{r.name} (Michael {r.me_percentage}% / Liz {r.wife_percentage}%)</option>)}</select></label>}</div>
+    <fieldset disabled={busy}><div className="fields">
+      <div role="group" aria-label="Expense owner"><p>Expense owner</p><div className="owner-buttons">{members.map(owner => <button type="button" key={owner} aria-pressed={draft.expense_owner === owner} onClick={() => {
+        setDraft({ ...draft, expense_owner: owner, split_rule: owner === 'JOINT' ? (draft.expense_owner === 'JOINT' ? draft.split_rule : data.defaultSplit) : null });
+      }}>{owner}</button>)}</div></div>
+      <div><p>Payer: <strong>{draft.payer ?? 'Not set'}</strong></p>{!draft.payer && <p>Choose a payer in Advanced before confirming review.</p>}</div>
+    </div>
     {!row.metadata.payer && row.payerHint && <p>Payer hint: {row.payerHint}, from the account name. Verify before saving.</p>}
-    {split && <p>Split preview: Michael {money(split.MICHAEL)} · Liz {money(split.LIZ)}. Applies to this transaction only.</p>}
+    <button type="button" aria-expanded={advanced} aria-controls={advancedId} onClick={() => setAdvanced(!advanced)}>Advanced</button>
+    <div id={advancedId} hidden={!advanced}>
+      <div className="fields"><label>Payer override<select value={draft.payer ?? ''} onChange={e => setDraft({ ...draft, payer: (e.target.value || null) as Member | null })}><option value="">Choose payer</option>{members.map(m => <option key={m}>{m}</option>)}</select></label>
+      {draft.expense_owner === 'JOINT' && <label>Joint split<select value={draft.split_rule ?? ''} onChange={e => setDraft({ ...draft, split_rule: e.target.value || null })}><option value="">Choose split</option>{data.rules.map(r => <option key={r.id} value={r.id}>{r.name} (Michael {r.me_percentage}% / Liz {r.wife_percentage}%)</option>)}</select></label>}</div>
+      {split && <p>Split preview: Michael {money(split.MICHAEL)} · Liz {money(split.LIZ)}. Applies to this transaction only.</p>}
+    </div>
     <label>Household notes<textarea maxLength={2000} value={draft.notes ?? ''} onChange={e => setDraft({ ...draft, notes: e.target.value || null })} /></label>
     <div className="actions"><button onClick={() => save('NEEDS_REVIEW')}>Save for review</button><button className="primary" disabled={!draft.expense_owner || !draft.payer || (draft.expense_owner === 'JOINT' && !draft.split_rule)} onClick={() => save('REVIEWED')}>Confirm and mark reviewed</button></div></fieldset>
     {message && <p role="status">{message}</p>}
