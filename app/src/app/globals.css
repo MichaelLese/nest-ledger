@@ -38,7 +38,7 @@ button.advanced-toggle:hover { background: #334155; color: #e2e8f0; }
 .owner-control { display: flex; flex-direction: column; gap: 8px; }
 .owner-control > span, .payer-summary { color: #cbd5e1; font-size: .85rem; }
 .payer-summary { white-space: nowrap; }
-.review-card .actions { justify-content: flex-end; margin-top: 16px; gap: 8px; }
+.review-card .actions { justify-content: flex-end; margin-top: 0; gap: 8px; margin-left: auto; }
 .advanced-fields { margin-top: 16px; border-top: 1px solid #334155; padding-top: 4px; }
 @media (min-width: 900px) {
   .review-card { margin: 12px 0; padding: 12px 16px; }
@@ -47,7 +47,7 @@ button.advanced-toggle:hover { background: #334155; color: #e2e8f0; }
   .transaction-meta { margin: 4px 0 10px; }
   .owner-control { flex-direction: row; align-items: center; gap: 12px; }
   .review-card .owner-buttons button, .review-card .actions button { min-height: 34px; padding: 6px 10px; font-size: .85rem; }
-  .review-card .actions { margin-top: 10px; }
+  .review-card .actions { margin-top: 0; }
   .review-card .fields { gap: 12px; }
   .review-card label { margin: 8px 0; gap: 6px; }
   .review-card p { margin: 8px 0; }
