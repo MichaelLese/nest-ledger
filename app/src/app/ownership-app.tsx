@@ -74,7 +74,7 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
         setDraft({ ...draft, expense_owner: owner, split_rule: owner === 'JOINT' ? (draft.expense_owner === 'JOINT' ? draft.split_rule : data.defaultSplit) : null });
       }}>{owner}</button>)}</div></div>
       <span className="payer-summary">Payer: <strong>{draft.payer ?? 'Not set'}</strong></span>
-    </div>
+      <div className="actions"><button onClick={() => save('NEEDS_REVIEW')}>Save for review</button><button className="primary" disabled={!draft.expense_owner || !draft.payer || (draft.expense_owner === 'JOINT' && !draft.split_rule)} onClick={() => save('REVIEWED')}>Confirm and mark reviewed</button></div></div>
     {!draft.payer && <p>Choose a payer in Advanced before confirming review.</p>}
     <div className="advanced-fields" id={advancedId} hidden={!advanced}>
       {!row.metadata.payer && row.payerHint && <p>Payer hint: {row.payerHint}, from the account name. Verify before saving.</p>}
@@ -82,8 +82,7 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
       {draft.expense_owner === 'JOINT' && <label>Joint split<select value={draft.split_rule ?? ''} onChange={e => setDraft({ ...draft, split_rule: e.target.value || null })}><option value="">Choose split</option>{data.rules.map(r => <option key={r.id} value={r.id}>{r.name} (Michael {r.me_percentage}% / Liz {r.wife_percentage}%)</option>)}</select></label>}</div>
       {split && <p>Split preview: Michael {money(split.MICHAEL)} · Liz {money(split.LIZ)}. Applies to this transaction only.</p>}
       <label>Household notes<textarea maxLength={2000} value={draft.notes ?? ''} onChange={e => setDraft({ ...draft, notes: e.target.value || null })} /></label>
-    </div>
-    <div className="actions"><button onClick={() => save('NEEDS_REVIEW')}>Save for review</button><button className="primary" disabled={!draft.expense_owner || !draft.payer || (draft.expense_owner === 'JOINT' && !draft.split_rule)} onClick={() => save('REVIEWED')}>Confirm and mark reviewed</button></div></fieldset>
+    </div></fieldset>
     {message && <p role="status">{message}</p>}
   </article>;
 }
