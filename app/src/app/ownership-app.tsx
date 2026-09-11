@@ -140,11 +140,12 @@ function BillEditor({ row, currency, onSaved }: { row: BillCard; currency: strin
       <strong className={`bill-owner-chip${row.responsible_person === null ? ' bill-unassigned' : ''}`}>{row.responsible_person ?? 'Unassigned'}</strong>
     </div>}
     <p className="bill-source">{row.payingAccount ? `Paying account: ${row.payingAccount}` : 'Source: Actual schedule · Paying account unavailable'}</p>
-    {editing ? <fieldset disabled={busy}><div className="ownership-controls">
+    {editing && <fieldset disabled={busy}><div className="ownership-controls">
       <div className="owner-control" role="group" aria-label="Responsible person"><span>Responsible person</span><div className="owner-buttons">{members.map(person => <button type="button" key={person} aria-pressed={draft.responsible_person === person} onClick={() => setDraft({ ...draft, responsible_person: person })}>{person}</button>)}</div></div>
       <label className="check"><input type="checkbox" checked={draft.autopay} onChange={e => setDraft({ ...draft, autopay: e.target.checked })} />Autopay</label>
       <div className="actions"><button type="button" onClick={save}>{busy ? 'Saving…' : 'Save'}</button></div>
-    </div></fieldset> : <div className="actions"><button type="button" disabled={busy} onClick={() => { setDraft(row); setMessage(''); setEditing(true); }}>Edit</button></div>}
+    </div></fieldset>}
+    {!editing && <div className="bill-actions-row"><button type="button" disabled={busy} onClick={() => { setDraft(row); setMessage(''); setEditing(true); }}>Edit</button></div>}
     {message && <p role="status">{message}</p>}
   </article>;
 }
