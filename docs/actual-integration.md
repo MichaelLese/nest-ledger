@@ -150,3 +150,19 @@ transaction ID against Actual leaf transactions within that inclusive range;
 missing or out-of-month IDs return 409 without writing metadata. PUT without a
 month retains the existing current-month validation. Upcoming bills still show current Actual
 schedules, independently of the selected spending month.
+
+## Scheduled SimpleFIN bank sync
+
+Actual 26.9.0 has no server-side scheduler, so bank sync runs headlessly on a
+12-hour timer through the public @actual-app/api:
+[app/scripts/bank-sync.mjs](../app/scripts/bank-sync.mjs) calls `runBankSync()`
+inside the nest-ledger-web container — the same `api/bank-sync` core handler as
+Actual's UI "sync all now" button — then `sync()` to upload. The server's
+`/simplefin/*` HTTP routes only fetch and normalize bridge data; the budget
+import happens in Actual's own core, so no ledger logic is reimplemented here.
+The script prints per-account row counts and latest transaction dates (never
+credentials, payees or amounts) and exits 1 if any account failed, so a broken
+SimpleFIN connection stays visible in the schedule. This is operational
+tooling: the web app's own endpoints remain read-only and Actual stays the only
+ledger. agent-hub owns the schedule and the agent-hub wrapper; see
+[deployment](deployment.md).

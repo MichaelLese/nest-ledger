@@ -144,6 +144,76 @@ Then run `systemctl --user daemon-reload` and
 An interrupted SSH session or host failure may defeat the remote exit trap;
 check Actual is running after any failed backup and restart it if needed.
 
+## Scheduled SimpleFIN bank sync
+
+Actual 26.9.0 has no server-side scheduler for SimpleFIN, so agent-hub
+triggers the household bank sync every 12 hours through the same core code
+path as Actual's UI "sync all now" button. The trigger is
+[app/scripts/bank-sync.mjs](../app/scripts/bank-sync.mjs): inside the
+nest-ledger-web container it uses only public @actual-app/api 26.9.0 methods
+(`init`, `downloadBudget`, `runBankSync()`, `sync()`), prints per-account row
+counts and latest transaction dates for the last 14 days, and never prints
+credentials, payees or amounts. The server's `/simplefin/*` HTTP routes only
+fetch and normalize bridge data; the budget import happens in Actual's own
+core inside `runBankSync()`, with Actual's own lookback (89 days or the
+account's oldest transaction). A failing account — for example a SimpleFIN
+connection needing attention — still uploads the healthy accounts, prints the
+summary and exits 1 so the failure stays visible.
+
+Agent-hub runs [infrastructure/bank-sync-agent-hub.sh](../infrastructure/bank-sync-agent-hub.sh)
+as `agent`, installed at `/home/agent/.local/bin/nest-ledger-bank-sync` (mode
+700). Each run first refreshes the in-container copy with
+`docker compose cp app/scripts/bank-sync.mjs nest-ledger-web:app/app/scripts/bank-sync.mjs`
+and then executes it with `docker compose exec -T -u node`, so scheduled
+syncs survive container recreation and image rebuilds. The CT copy lives at
+`/opt/nest-ledger/app/scripts/bank-sync.mjs` in the repository deploy tree.
+The systemd user timer `nest-ledger-bank-sync.timer` fires at **00:00 and
+12:00 UTC** with `Persistent=true`; user lingering is enabled.
+
+First verified 2026-09-13: accounts previously stalled at Sep 9 gained
+Sep 10-13 rows on the healthy connections (Joint Chase Checkings 9/11,
+Chase United 9/12, Citi Strata 9/13, CitiBank Checkings 9/10). Four accounts
+(Liz - Walden Savings/Checkings/CD, Michael - TSP Retirement) return
+ACCOUNT_NEEDS_ATTENTION from the SimpleFIN bridge until the operator re-links
+them there; the service keeps exiting 1 and the journal still lists every
+account's latest date, so a failing connection cannot pass silently.
+
+Check or run the sync on agent-hub:
+
+```sh
+systemctl --user list-timers nest-ledger-bank-sync.timer
+systemctl --user start nest-ledger-bank-sync.service
+journalctl --user -u nest-ledger-bank-sync.service -n 40
+```
+
+To reinstall, install the script mode 700 and create these units under
+`/home/agent/.config/systemd/user/` (the agent user must have lingering
+enabled):
+
+```ini
+# nest-ledger-bank-sync.service
+[Unit]
+Description=Nest Ledger scheduled SimpleFIN bank sync
+[Service]
+Type=oneshot
+ExecStart=/home/agent/.local/bin/nest-ledger-bank-sync
+TimeoutStartSec=15min
+```
+
+```ini
+# nest-ledger-bank-sync.timer
+[Unit]
+Description=Twice-daily Nest Ledger bank sync
+[Timer]
+OnCalendar=*-*-* 00,12:00:00 UTC
+Persistent=true
+[Install]
+WantedBy=timers.target
+```
+
+Then run `systemctl --user daemon-reload` and
+`systemctl --user enable --now nest-ledger-bank-sync.timer`.
+
 ## Restore into an isolated replacement CT
 
 Use a fresh CT with no production routes or bank connectivity. Do not run these
