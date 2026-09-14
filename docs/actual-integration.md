@@ -104,7 +104,8 @@ all five member foreign keys were verified unchanged; both dependent tables
 remained empty. A protected off-CT PostgreSQL dump was taken beforehand.
 Do not reapply 001 or 002 to this deployment.
 
-Each migration runs atomically and deliberately fails on reapplication. Apply
+Migrations 001 and 002 run atomically and deliberately fail on reapplication.
+Migration 003 is an atomic, rerunnable data backfill (see below). Apply
 future numbered migrations in order; back up first. They are not applied silently
 at application startup and work with existing Compose volumes. PostgreSQL
 remains unpublished on the internal database network.
@@ -182,3 +183,45 @@ environment: without PGHOST/PGDATABASE it prints one skip line and leaves the
 exit code unchanged, while a configured database that fails to accept defaults
 makes the run exit 1 so the schedule surfaces it. Only counts are printed,
 never amounts, payees or credentials.
+
+## Legacy metadata backfill
+
+PR #21 defaults new metadata inserts only; existing `NEEDS_REVIEW` rows require
+[003_backfill_metadata_reviewed.sql](../infrastructure/migrations/003_backfill_metadata_reviewed.sql).
+This migration marks every `NEEDS_REVIEW` row `REVIEWED`, preserves its existing
+expense owner, and fills a null payer from that owner. It fills a null JOINT split
+from `household_settings.default_joint_split`. Existing payers, splits, notes,
+and already REVIEWED rows are unchanged. Null owners remain null; this operation
+does not read Actual or infer owners from accounts. It aborts without changes if
+a JOINT row needs a split and the household default is missing. Locks have a
+10-second acquisition timeout; retry after conflicting work finishes.
+
+After backing up the metadata database, run this SELECT first from the deployment
+repository root to verify the exact UPDATE predicate (counts only):
+
+```sh
+docker compose --env-file infrastructure/.env -f infrastructure/compose.yaml exec -T postgres \
+  sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' <<'SQL'
+SELECT expense_owner, count(*) AS candidates,
+       count(*) FILTER (WHERE payer IS NULL) AS missing_payer,
+       count(*) FILTER (WHERE expense_owner = 'JOINT' AND split_rule IS NULL) AS missing_joint_split
+FROM transaction_metadata WHERE review_status = 'NEEDS_REVIEW'
+GROUP BY expense_owner ORDER BY expense_owner;
+SELECT default_joint_split IS NOT NULL AS default_joint_split_configured
+FROM household_settings WHERE id = true;
+SQL
+```
+
+Then apply only 003 (do not reapply 001/002):
+
+```sh
+docker compose --env-file infrastructure/.env -f infrastructure/compose.yaml exec -T postgres \
+  sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' \
+  < infrastructure/migrations/003_backfill_metadata_reviewed.sql
+```
+
+Repeat the SELECT to verify no candidates remain. The migration reports its
+UPDATE count; an immediate rerun reports UPDATE 0. Future NEEDS_REVIEW rows would
+also qualify on a later rerun, so inspect candidates each time. No app rebuild or
+restart is needed; refresh the transaction list. Application startup and bank
+sync do not run this migration automatically.
