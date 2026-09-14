@@ -159,9 +159,15 @@ Categories aggregate across all owners by Actual category ID, including hidden
 categories. Missing categories display as Uncategorized; unresolved IDs display
 as Unknown category. Ordering is descending spend, then name and ID for ties.
 
-The section below the transaction list always shows the whole household,
-independent of owner filters. Successful tagging updates owner cards immediately from saved
-rows; Refresh reloads the full summary. Currency uses household settings and the
+The monthly summary above the transaction list keeps whole-household owner totals,
+independent of transaction owner filters. Clicking MICHAEL, LIZ, JOINT or
+Unclassified filters Top categories to that saved expense owner; clicking the
+active card again or the global ALL button restores overall categories. The
+selected card and category badge identify the active view. Successful tagging
+updates owner cards and selected categories immediately from saved rows. The
+existing response includes each transaction's category ID so the client can
+aggregate by ID, including categories outside the overall top eight. Refresh,
+in the header immediately before Sign out, reloads the full summary. Currency uses household settings and the
 existing minor-unit formatter. This slice adds no charts or dependencies.
 
 ## Phase 5 bills surface

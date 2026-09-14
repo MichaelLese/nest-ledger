@@ -59,7 +59,11 @@ button.advanced-toggle:hover { background: #334155; color: #e2e8f0; }
 .monthly-summary { margin-top: 32px; border-top: 1px solid #475569; padding-top: 24px; }
 .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .summary-cards .review-card { margin: 0; }
-.summary-cards h3 { color: #94a3b8; font-size: .85rem; margin-bottom: 8px; }
+.header-actions { display: flex; gap: 12px; margin-left: auto; }
+.summary-member { text-align: left; padding: 20px; border-color: #475569; border-radius: 10px; background: #172033; }
+.summary-member:hover { background: #253349; border-color: #94a3b8; }
+.summary-member[aria-pressed=true] { background: #193339; border-color: #5eead4; }
+.summary-member-label { display: block; color: #94a3b8; font-size: .85rem; margin-bottom: 8px; }
 .summary-cards strong { font-size: 1.25rem; }
 .summary-categories { padding: 0; margin-top: 12px; list-style: none; }
 .summary-categories li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-top: 1px solid #334155; }

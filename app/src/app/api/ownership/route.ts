@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const bills = billCards(summary.schedules, await readBills((summary.schedules ?? []).map(s => s.id)), summary.accounts);
     return Response.json({ member, ...config, bills, summary: monthlySummary({ ...summary, transactions }, [...metadata.values()], range.through), transactions: transactions.map(t => {
       const account = summary.accounts.find(a => a.id === t.account)?.name ?? 'Unknown account';
-      return { id: t.id, date: t.date, amount: t.amount, transfer_id: t.transfer_id, description: summary.payees?.find(p => p.id === t.payee)?.name || t.notes || 'Transaction', account, categoryName: categoryName(t, summary.categories), parentId: t.parent_id ?? null,
+      return { id: t.id, date: t.date, amount: t.amount, transfer_id: t.transfer_id, description: summary.payees?.find(p => p.id === t.payee)?.name || t.notes || 'Transaction', account, category: t.category || null, categoryName: categoryName(t, summary.categories), parentId: t.parent_id ?? null,
         payerHint: payerHint(account), metadata: metadata.get(t.id) ?? { actual_transaction_id: t.id, expense_owner: null, payer: null, split_rule: null, notes: null, review_status: 'NEEDS_REVIEW' } };
     }) }, { headers: privateHeaders });
   } catch { return jsonError('Unable to load transactions. Check Actual and household database configuration.', 503); }

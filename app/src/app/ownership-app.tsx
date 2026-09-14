@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { allocate, members, type Member, type Metadata, type SplitRule } from '../server/ownership';
 import { monthlySummary, type MonthlySummary } from '../server/monthly-summary';
 import { billDueStatus, type BillCard, type BillMetadata } from '../server/bills';
 import type { LoginMember } from '../server/session';
-type Row = { transfer_id?: string | null; id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
+type CategoryOwner = Member | 'UNCLASSIFIED' | 'ALL';
+type Row = { category: string | null; transfer_id?: string | null; id: string; date: string; amount: number; description: string; categoryName: string | null; account: string; parentId: string | null; payerHint: Member | null; metadata: Metadata };
 type Data = { bills: BillCard[]; summary: MonthlySummary; rules: SplitRule[]; defaultSplit: string | null; currency: string; transactions: Row[] };
 async function api(path: string, method = 'GET', body?: unknown) {
   const response = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
@@ -17,6 +18,7 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Member | 'ALL'>('ALL');
+  const [categoryOwner, setCategoryOwner] = useState<CategoryOwner>('ALL');
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [month, setMonth] = useState(currentMonth);
   const [refresh, setRefresh] = useState(0);
@@ -45,19 +47,17 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
       <button disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
     </form>{error && <p role="alert">{error}</p>}</main>;
   const shown = data?.transactions.filter(t => filter === 'ALL' || t.metadata.expense_owner === filter) ?? [];
-  return <main><header><div><h1>Transaction ownership</h1><p>Signed in as {member}</p></div><button onClick={async () => {
+  return <main><header><div><h1>Transaction ownership</h1><p>Signed in as {member}</p></div><div className="header-actions"><button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</button><button onClick={async () => {
     try { await api('/api/auth/logout', 'POST'); window.location.reload(); } catch (e) { setError((e as Error).message); }
-  }}>Sign out</button></header>
+  }}>Sign out</button></div></header>
     <p>{historical ? 'Historical UTC month. Bank sync saves each transaction immediately with the paying account’s member as expense owner. Change the owner or payer anytime; every change saves directly.' : 'Current UTC month through today. Bank sync saves each transaction immediately with the paying account’s member as expense owner. Change the owner or payer anytime; every change saves directly.'}</p>
-    <nav aria-label="Expense owner filter">{(['ALL', ...members] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value}</button>)}</nav>
-    <div className="toolbar"><button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</button></div>
-    <p>Filters use expense ownership; transactions without an owner appear under ALL.</p>
+    <nav aria-label="Expense owner filter">{(['ALL', ...members] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); if (value === 'ALL') setCategoryOwner('ALL'); }}>{value}</button>)}</nav>
     {error && <p role="alert">{error}</p>}
     <section className="monthly-summary" aria-labelledby="monthly-summary-title">
       <h2 id="monthly-summary-title">Monthly household spending</h2>
       <MonthPicker month={month} currentMonth={currentMonth} onChange={changeMonth} />
       {loading && <p role="status">Loading selected month…</p>}
-      {data && <MonthlyOverview data={data} />}
+      {data && <MonthlyOverview data={data} categoryOwner={categoryOwner} onSelect={setCategoryOwner} />}
     </section>
     {data && <><p role="status">{shown.length} transactions shown</p>
       {shown.length === 0 && <p>No transactions match this view.</p>}
@@ -83,19 +83,25 @@ function MonthPicker({ month, currentMonth, onChange }: { month: string; current
     {month !== currentMonth && <button type="button" onClick={() => onChange(currentMonth)}>Back to current month</button>}
   </nav>;
 }
-function MonthlyOverview({ data }: { data: Data }) {
+export function MonthlyOverview({ data, categoryOwner, onSelect }: { data: Data; categoryOwner: CategoryOwner; onSelect: (owner: CategoryOwner) => void }) {
   // Recalculate owners from saved rows so successful tagging updates the cards immediately.
   const owners = monthlySummary({ transactions: data.transactions, accounts: [], categories: [] }, data.transactions.map(row => row.metadata), data.summary.through).owners;
+  const categories = data.transactions.flatMap(row => row.category && row.categoryName ? [{ id: row.category, name: row.categoryName }] : []);
+  const topCategories = categoryOwner === 'ALL' ? data.summary.topCategories : monthlySummary({
+    transactions: data.transactions.filter(row => (row.metadata.expense_owner ?? 'UNCLASSIFIED') === categoryOwner),
+    accounts: [], categories,
+  }, data.transactions.map(row => row.metadata), data.summary.through).topCategories;
+  const categoryLabel = categoryOwner === 'ALL' ? 'Overall' : categoryOwner === 'UNCLASSIFIED' ? 'Unclassified' : categoryOwner;
   const money = (amount: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency }).format(amount / 100);
   return <div>
     <p>{data.summary.from} – {data.summary.through} · UTC <span className="review-status">All household transactions</span></p>
     <p>Spending excludes income, refunds and transfers. Totals use saved expense ownership, including bank-sync defaults.</p>
     {Object.values(owners).some(amount => amount > 0) && members.every(owner => owners[owner] === 0) && <p>No household expense-owner tags recorded for spending this month. All spending is Unclassified.</p>}
-    <div className="summary-cards">{([...members, 'UNCLASSIFIED'] as const).map(owner => <article className="review-card" key={owner}>
-      <h3>{owner === 'UNCLASSIFIED' ? 'Unclassified' : owner}</h3><strong className="transaction-amount">{money(owners[owner])}</strong>
-    </article>)}</div>
-    <article className="review-card"><h3>Top categories <span className="review-status">Overall · up to 8</span></h3>
-      {data.summary.topCategories.length === 0 ? <p>No spending this month.</p> : <ol className="summary-categories">{data.summary.topCategories.map(category => <li key={category.id ?? 'uncategorized'}><span>{category.name}</span><strong className="transaction-amount">{money(category.amount)}</strong></li>)}</ol>}
+    <div className="summary-cards">{([...members, 'UNCLASSIFIED'] as const).map(owner => <button type="button" className="review-card summary-member" key={owner} aria-pressed={categoryOwner === owner} onClick={() => onSelect(categoryOwner === owner ? 'ALL' : owner)}>
+      <span className="summary-member-label">{owner === 'UNCLASSIFIED' ? 'Unclassified' : owner}</span><strong className="transaction-amount">{money(owners[owner])}</strong>
+    </button>)}</div>
+    <article className="review-card"><h3>Top categories <span className="review-status">{categoryLabel} · up to 8</span></h3>
+      {topCategories.length === 0 ? <p>No spending this month.</p> : <ol className="summary-categories">{topCategories.map(category => <li key={category.id ?? 'uncategorized'}><span>{category.name}</span><strong className="transaction-amount">{money(category.amount)}</strong></li>)}</ol>}
     </article>
   </div>;
 }
