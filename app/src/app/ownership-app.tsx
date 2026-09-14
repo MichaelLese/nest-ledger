@@ -22,7 +22,6 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [month, setMonth] = useState(currentMonth);
   const [refresh, setRefresh] = useState(0);
-  const historical = month < currentMonth;
   useEffect(() => {
     if (!member) return;
     let active = true;
@@ -50,7 +49,6 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   return <main><header><div><h1>Transaction ownership</h1><p>Signed in as {member}</p></div><div className="header-actions"><button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</button><button onClick={async () => {
     try { await api('/api/auth/logout', 'POST'); window.location.reload(); } catch (e) { setError((e as Error).message); }
   }}>Sign out</button></div></header>
-    <p>{historical ? 'Historical UTC month. Bank sync saves each transaction immediately with the paying account’s member as expense owner. Change the owner or payer anytime; every change saves directly.' : 'Current UTC month through today. Bank sync saves each transaction immediately with the paying account’s member as expense owner. Change the owner or payer anytime; every change saves directly.'}</p>
     <nav aria-label="Expense owner filter">{(['ALL', ...members] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); if (value === 'ALL') setCategoryOwner('ALL'); }}>{value}</button>)}</nav>
     {error && <p role="alert">{error}</p>}
     <section className="monthly-summary" aria-labelledby="monthly-summary-title">
@@ -95,7 +93,6 @@ export function MonthlyOverview({ data, categoryOwner, onSelect }: { data: Data;
   const money = (amount: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency }).format(amount / 100);
   return <div>
     <p>{data.summary.from} – {data.summary.through} · UTC <span className="review-status">All household transactions</span></p>
-    <p>Spending excludes income, refunds and transfers. Totals use saved expense ownership, including bank-sync defaults.</p>
     {Object.values(owners).some(amount => amount > 0) && members.every(owner => owners[owner] === 0) && <p>No household expense-owner tags recorded for spending this month. All spending is Unclassified.</p>}
     <div className="summary-cards">{([...members, 'UNCLASSIFIED'] as const).map(owner => <button type="button" className="review-card summary-member" key={owner} aria-pressed={categoryOwner === owner} onClick={() => onSelect(categoryOwner === owner ? 'ALL' : owner)}>
       <span className="summary-member-label">{owner === 'UNCLASSIFIED' ? 'Unclassified' : owner}</span><strong className="transaction-amount">{money(owners[owner])}</strong>
