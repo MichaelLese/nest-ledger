@@ -18,6 +18,8 @@ test('ownership PUT validates selected months and preserves default saves', asyn
     },
     '../src/server/db': {
       householdConfig: async () => ({ rules: [] }),
+      readMetadata: async () => [],
+      readBills: async () => [],
       saveMetadata: async (metadata: Metadata) => { saved.push(metadata); },
     },
     '../src/server/actual': {
@@ -25,13 +27,13 @@ test('ownership PUT validates selected months and preserves default saves', asyn
         calls.push(range);
         const transactions = [
           { id: 'current', date: today, account: 'a', amount: -100 },
-          { id: 'past', date: '2024-02-29', account: 'a', amount: -100 },
+          { id: 'past', date: '2024-02-29', account: 'a', amount: -100, category: 'food' },
           { id: 'before', date: '2024-01-31', account: 'a', amount: -100 },
           { id: 'after', date: '2024-03-01', account: 'a', amount: -100 },
           { id: 'parent', date: '2024-02-10', account: 'a', amount: -100, is_parent: true },
         ];
         // Deliberately return out-of-range rows for explicit reads to verify route enforcement.
-        return { transactions: range ? transactions : transactions.filter(t => t.date === today) };
+        return { transactions: range ? transactions : transactions.filter(t => t.date === today), accounts: [], categories: [{ id: 'food', name: 'Food' }] };
       },
     },
   };
@@ -45,7 +47,7 @@ test('ownership PUT validates selected months and preserves default saves', asyn
       originals.set(id, require.cache[id]);
       require.cache[id] = { id, filename: id, loaded: true, exports } as NodeModule;
     }
-    const { PUT } = require(routeId) as typeof import('../src/app/api/ownership/route');
+    const { GET, PUT } = require(routeId) as typeof import('../src/app/api/ownership/route');
     const put = (query: string, id = 'past', review_status = valid.review_status, requestOrigin = process.env.AUTH_ORIGIN!) => PUT(new Request('https://household.example/api/ownership' + query, {
       method: 'PUT', headers: { origin: requestOrigin, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...valid, actual_transaction_id: id, review_status }),
     }));
@@ -71,6 +73,12 @@ test('ownership PUT validates selected months and preserves default saves', asyn
     assert.deepEqual(calls.at(-1), { from: today.slice(0, 8) + '01', through: today });
     assert.equal(saved.length, 4);
     assert.equal((await put('?month=2024-02', 'past', 'REVIEWED', 'https://other.example')).status, 403);
+    const response = await GET(new Request('https://household.example/api/ownership?month=2024-02'));
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.transactions.length, 1);
+    assert.equal(payload.transactions[0].category, 'food');
+    assert.equal(payload.transactions[0].categoryName, 'Food');
     authenticated = false;
     assert.equal((await put('?month=2024-02')).status, 401);
     assert.equal(saved.length, 4);
