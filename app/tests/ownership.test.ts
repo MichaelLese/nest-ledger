@@ -13,9 +13,10 @@ test('account hints recognize prefixes without inferring expense ownership', () 
   assert.equal(payerHint('Liz'), 'LIZ'); assert.equal(payerHint('Joint Savings'), 'JOINT');
   assert.equal(payerHint('Elizabeth'), null); assert.equal(payerHint('Michaelson'), null); assert.equal(payerHint('Savings Liz'), null);
 });
-test('review requires owner and payer; joint rule must exist; personal rule is rejected', () => {
+test('saving requires an owner; payer is optional until set; joint rule must exist; personal rule is rejected', () => {
   assert.deepEqual(parseMetadata(valid, [rule]), valid);
-  for (const patch of [{ expense_owner: null }, { payer: null }, { expense_owner: 'ME' }, { payer: 'WIFE' }, { split_rule: 'missing' }, { expense_owner: 'MICHAEL' }, { review_status: 'yes' }, { notes: 'x'.repeat(2001) }, { actual_transaction_id: '' }]) assert.throws(() => parseMetadata({ ...valid, ...patch }, [rule]));
+  for (const patch of [{ expense_owner: null }, { expense_owner: 'ME' }, { payer: 'WIFE' }, { split_rule: 'missing' }, { expense_owner: 'MICHAEL' }, { review_status: 'yes' }, { notes: 'x'.repeat(2001) }, { actual_transaction_id: '' }]) assert.throws(() => parseMetadata({ ...valid, ...patch }, [rule]));
+  assert.equal(parseMetadata({ ...valid, payer: null }, [rule]).payer, null);
   assert.equal(parseMetadata({ ...valid, expense_owner: null, payer: null, split_rule: null, review_status: 'NEEDS_REVIEW' }, [rule]).review_status, 'NEEDS_REVIEW');
 });
 test('joint split preserves signed integer total, rounding half minor units to Michael', () => {

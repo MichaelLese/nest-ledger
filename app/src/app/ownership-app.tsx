@@ -17,7 +17,6 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<Member | 'ALL'>('ALL');
-  const [queue, setQueue] = useState(true);
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [month, setMonth] = useState(currentMonth);
   const [refresh, setRefresh] = useState(0);
@@ -45,14 +44,14 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
       <label>Password<input name="password" type="password" autoComplete="current-password" required maxLength={1024} /></label>
       <button disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
     </form>{error && <p role="alert">{error}</p>}</main>;
-  const shown = data?.transactions.filter(t => (filter === 'ALL' || t.metadata.expense_owner === filter) && (!queue || t.metadata.review_status === 'NEEDS_REVIEW')) ?? [];
+  const shown = data?.transactions.filter(t => filter === 'ALL' || t.metadata.expense_owner === filter) ?? [];
   return <main><header><div><h1>Transaction ownership</h1><p>Signed in as {member}</p></div><button onClick={async () => {
     try { await api('/api/auth/logout', 'POST'); window.location.reload(); } catch (e) { setError((e as Error).message); }
   }}>Sign out</button></header>
-    <p>{historical ? 'Historical UTC month. Confirm who owns each expense and who paid it. Account hints need your confirmation.' : 'Current UTC month through today. Confirm who owns each expense and who paid it. Account hints need your confirmation.'}</p>
+    <p>{historical ? 'Historical UTC month. Bank sync saves each transaction immediately with the paying account’s member as expense owner. Change the owner or payer anytime; every change saves directly.' : 'Current UTC month through today. Bank sync saves each transaction immediately with the paying account’s member as expense owner. Change the owner or payer anytime; every change saves directly.'}</p>
     <nav aria-label="Expense owner filter">{(['ALL', ...members] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value}</button>)}</nav>
-    <div className="toolbar"><label className="check"><input type="checkbox" checked={queue} onChange={e => setQueue(e.target.checked)} />Needs review only</label><button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</button></div>
-    <p>Filters use confirmed expense ownership. Untagged transactions appear under ALL.</p>
+    <div className="toolbar"><button disabled={loading} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Loading…' : 'Refresh'}</button></div>
+    <p>Filters use expense ownership; transactions without an owner appear under ALL.</p>
     {error && <p role="alert">{error}</p>}
     <section className="monthly-summary" aria-labelledby="monthly-summary-title">
       <h2 id="monthly-summary-title">Monthly household spending</h2>
@@ -60,7 +59,7 @@ export default function OwnershipApp({ member }: { member: LoginMember | null })
       {loading && <p role="status">Loading selected month…</p>}
       {data && <MonthlyOverview data={data} />}
     </section>
-    {data && <><p role="status">{shown.length} transactions shown · {data.transactions.filter(t => t.metadata.review_status === 'NEEDS_REVIEW').length} need review this month</p>
+    {data && <><p role="status">{shown.length} transactions shown</p>
       {shown.length === 0 && <p>No transactions match this view.</p>}
       {shown.map(row => <TransactionEditor key={row.id} row={row} data={data} onSaved={metadata => setData(current => current && ({ ...current, transactions: current.transactions.map(t => t.id === row.id ? { ...t, metadata } : t) }))} />)}
       <section className="monthly-summary" aria-labelledby="bills-title"><h2 id="bills-title">Upcoming bills</h2>
@@ -90,7 +89,7 @@ function MonthlyOverview({ data }: { data: Data }) {
   const money = (amount: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency }).format(amount / 100);
   return <div>
     <p>{data.summary.from} – {data.summary.through} · UTC <span className="review-status">All household transactions</span></p>
-    <p>Spending excludes income, refunds and transfers. Saved owner tags count even when awaiting review. Review filters do not change these totals.</p>
+    <p>Spending excludes income, refunds and transfers. Totals use saved expense ownership, including bank-sync defaults.</p>
     {Object.values(owners).some(amount => amount > 0) && members.every(owner => owners[owner] === 0) && <p>No household expense-owner tags recorded for spending this month. All spending is Unclassified.</p>}
     <div className="summary-cards">{([...members, 'UNCLASSIFIED'] as const).map(owner => <article className="review-card" key={owner}>
       <h3>{owner === 'UNCLASSIFIED' ? 'Unclassified' : owner}</h3><strong className="transaction-amount">{money(owners[owner])}</strong>
@@ -105,39 +104,47 @@ function TransactionEditor({ row, data, onSaved }: { row: Row; data: Data; onSav
   const [advanced, setAdvanced] = useState(false);
   const [draft, setDraft] = useState<Metadata>({ ...row.metadata, payer: row.metadata.payer ?? row.payerHint });
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<{ text: string; failed: boolean } | null>(null);
   useEffect(() => { setDraft({ ...row.metadata, payer: row.metadata.payer ?? row.payerHint }); }, [row.metadata, row.payerHint]);
   const money = (amount: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency }).format(amount / 100);
   const rule = data.rules.find(r => r.id === draft.split_rule);
   const split = draft.expense_owner === 'JOINT' && rule ? allocate(row.amount, rule) : null;
-  async function save(review_status: Metadata['review_status']) {
-    setBusy(true); setMessage('');
-    try { const result = await api(`/api/ownership?month=${data.summary.from.slice(0, 7)}`, 'PUT', { ...draft, review_status }); onSaved(result.metadata); setMessage(review_status === 'REVIEWED' ? 'Review confirmed.' : 'Saved for review.'); }
-    catch (e) { setMessage((e as Error).message); }
-    finally { setBusy(false); }
+  // Every change saves directly; there is no review or confirmation gate.
+  async function save(change: Partial<Metadata>) {
+    setBusy(true); setMessage(null);
+    try {
+      const result = await api(`/api/ownership?month=${data.summary.from.slice(0, 7)}`, 'PUT', { ...draft, ...change, review_status: 'REVIEWED' });
+      onSaved(result.metadata);
+      setDraft({ ...result.metadata, payer: result.metadata.payer ?? row.payerHint });
+      setMessage({ text: 'Saved.', failed: false });
+      setTimeout(() => setMessage(null), 2500);
+    } catch (e) {
+      setMessage({ text: (e as Error).message, failed: true });
+    } finally { setBusy(false); }
   }
   return <article className="review-card"><div className="transaction-heading">
     <h2>{row.description}</h2><div className="transaction-header-controls"><strong className="transaction-amount">{money(row.amount)}</strong>
       <button className="advanced-toggle" type="button" disabled={busy} aria-expanded={advanced} aria-controls={advancedId} onClick={() => setAdvanced(!advanced)}>Advanced</button>
     </div></div>
     <div className="transaction-meta"><span>{[row.date, row.account, row.categoryName, row.parentId ? 'Actual split item' : null].filter(Boolean).join(' · ')}</span>
-      <span className={`review-status${row.metadata.review_status === 'REVIEWED' ? ' reviewed' : ''}`}>{row.metadata.review_status === 'REVIEWED' ? 'Reviewed' : 'Needs review'}</span>
     </div>
     <fieldset disabled={busy}><div className="ownership-controls">
       <div className="owner-control" role="group" aria-label="Expense owner"><span>Expense owner</span><div className="owner-buttons">{members.map(owner => <button type="button" key={owner} aria-pressed={draft.expense_owner === owner} onClick={() => {
-        setDraft({ ...draft, expense_owner: owner, split_rule: owner === 'JOINT' ? (draft.expense_owner === 'JOINT' ? draft.split_rule : data.defaultSplit) : null });
+        if (draft.expense_owner === owner) return;
+        save({ expense_owner: owner, split_rule: owner === 'JOINT' ? (draft.expense_owner === 'JOINT' ? draft.split_rule : data.defaultSplit) : null });
       }}>{owner}</button>)}</div></div>
       <span className="payer-summary">Payer: <strong>{draft.payer ?? 'Not set'}</strong></span>
-      <div className="actions"><button onClick={() => save('NEEDS_REVIEW')}>Save for review</button><button className="primary" disabled={!draft.expense_owner || !draft.payer || (draft.expense_owner === 'JOINT' && !draft.split_rule)} onClick={() => save('REVIEWED')}>Confirm and mark reviewed</button></div></div>
-    {!draft.payer && <p>Choose a payer in Advanced before confirming review.</p>}
+    </div>
+    {!draft.payer && <p>Choose a payer in Advanced so the household knows who paid this.</p>}
     <div className="advanced-fields" id={advancedId} hidden={!advanced}>
-      {!row.metadata.payer && row.payerHint && <p>Payer hint: {row.payerHint}, from the account name. Verify before saving.</p>}
-      <div className="fields"><label>Payer override<select value={draft.payer ?? ''} onChange={e => setDraft({ ...draft, payer: (e.target.value || null) as Member | null })}><option value="">Choose payer</option>{members.map(m => <option key={m}>{m}</option>)}</select></label>
+      {!row.metadata.payer && row.payerHint && <p>Payer hint: {row.payerHint}, from the account name.</p>}
+      <div className="fields"><label>Payer<select value={draft.payer ?? ''} onChange={e => setDraft({ ...draft, payer: (e.target.value || null) as Member | null })}><option value="">Choose payer</option>{members.map(m => <option key={m}>{m}</option>)}</select></label>
       {draft.expense_owner === 'JOINT' && <label>Joint split<select value={draft.split_rule ?? ''} onChange={e => setDraft({ ...draft, split_rule: e.target.value || null })}><option value="">Choose split</option>{data.rules.map(r => <option key={r.id} value={r.id}>{r.name} (Michael {r.me_percentage}% / Liz {r.wife_percentage}%)</option>)}</select></label>}</div>
       {split && <p>Split preview: Michael {money(split.MICHAEL)} · Liz {money(split.LIZ)}. Applies to this transaction only.</p>}
       <label>Household notes<textarea maxLength={2000} value={draft.notes ?? ''} onChange={e => setDraft({ ...draft, notes: e.target.value || null })} /></label>
+      <div className="actions"><button type="button" onClick={() => save({})}>{busy ? 'Saving…' : 'Save'}</button></div>
     </div></fieldset>
-    {message && <p role="status">{message}</p>}
+    {message && <p className={message.failed ? undefined : 'toast'} role={message.failed ? 'alert' : 'status'}>{message.text}</p>}
   </article>;
 }
 
