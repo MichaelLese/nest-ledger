@@ -22,6 +22,10 @@ default, the initial expense owner; it can be overridden anytime. Accounts
 without a member prefix stay unclassified until edited. Absent rows display
 no owner and never write metadata on read.
 
+Legacy `NEEDS_REVIEW` metadata can be repaired with the documented
+[rerunnable backfill](actual-integration.md#legacy-metadata-backfill), preserving
+existing ownership and edits.
+
 There is no review queue or review status in the UI. Every transaction for the
 month appears in one list, and the MICHAEL / LIZ / JOINT buttons in each card
 save the expense owner directly — no confirm or mark-reviewed gate. The card
