@@ -1,33 +1,46 @@
 # Phase 4 ownership workflow
 
-Actual remains the only ledger. The home page provides transaction tagging and a
-review queue for the **selected UTC calendar month**. The current month runs
+Actual remains the only ledger. The home page provides transaction tagging for
+the **selected UTC calendar month**. The current month runs
 through today; historical months cover the full calendar month. The month picker
 retains its current-month upper limit. All months use the same transaction editor
-and Save for review / Confirm and mark reviewed flow. No Actual mutation or bank-sync calls are added.
+and direct-save flow. No Actual mutation or bank-sync calls are added.
 The existing read downloads a temporary Actual budget; it now also reads payee
-names for transaction identification. Review cards also show the Actual category
+names for transaction identification. Cards also show the Actual category
 name, including hidden categories, with each split child using its own category.
-Date, account, and any resolved category share one muted metadata line alongside
-a compact review-status badge. Missing or unresolved categories are omitted.
+Date, account, and any resolved category share one muted metadata line.
+Missing or unresolved categories are omitted.
 
 Each Actual transaction ID maps to one optional `transaction_metadata` row.
-Absent rows have NEEDS_REVIEW status with no saved owner or payer. A Michael/Liz/Joint
-account prefix suggests the **payer only**; it never determines expense ownership
-or writes metadata on read. Select the expense owner explicitly with the MICHAEL / LIZ / JOINT buttons.
-The card prefills an unset payer from the account hint and displays it as read-only
-text. Each card has an Advanced disclosure, closed by default, for overriding the
-payer, editing household notes, and, for JOINT owners only, choosing a split rule
-and viewing its preview. The account-name payer hint also appears inside Advanced.
-On desktop, the compact header keeps the amount beside the description and a
-secondary Advanced button; expense-owner buttons and the payer share a row.
-Narrow screens retain larger controls and stack the owner label above its buttons.
-Saved payer overrides take precedence over account hints. “Save for review”
-persists the draft as NEEDS_REVIEW; “Confirm and mark reviewed” requires both owner
-and payer and saves REVIEWED. Editing a reviewed row and saving for review reopens
-it. Either spouse can edit all household rows; simultaneous saves use last-write-wins.
-The ALL | MICHAEL | LIZ | JOINT filter uses saved expense ownership, so untagged
-rows appear only under ALL. Refresh reloads the view and discards unsaved edits.
+The scheduled bank sync saves each synced transaction immediately with the
+paying account's household member (Michael/Liz/Joint account-name prefix) as
+both expense owner and payer, status REVIEWED, with the household default
+joint split for JOINT owners; existing rows are never overwritten (see
+[Actual integration](actual-integration.md)). A Michael/Liz/Joint account
+prefix therefore suggests the payer and, through this operator-approved
+default, the initial expense owner; it can be overridden anytime. Accounts
+without a member prefix stay unclassified until edited. Absent rows display
+no owner and never write metadata on read.
+
+There is no review queue or review status in the UI. Every transaction for the
+month appears in one list, and the MICHAEL / LIZ / JOINT buttons in each card
+save the expense owner directly — no confirm or mark-reviewed gate. The card
+displays the payer (from the saved row or the account hint) as read-only text.
+Each card has an Advanced disclosure, closed by default, for overriding the
+payer, editing household notes, and, for JOINT owners only, choosing a split
+rule and viewing its preview; Advanced has its own Save button, which saves
+directly like the owner buttons. The account-name payer hint also appears
+inside Advanced. On desktop, the compact header keeps the amount beside the
+description and a secondary Advanced button; expense-owner buttons and the
+payer share a row. Narrow screens retain larger controls and stack the owner
+label above its buttons. Saved payer overrides take precedence over account
+hints. Saving requires an expense owner only; a payer can stay unset for
+accounts without a hint and be added later. JOINT saves require an existing
+`split_rules` rule, preselected from `household_settings.default_joint_split`.
+Either spouse can edit all household rows; simultaneous saves use
+last-write-wins. The ALL | MICHAEL | LIZ | JOINT filter uses saved expense
+ownership, so unowned rows appear only under ALL. Refresh reloads the view
+and discards unsaved edits.
 
 JOINT expenses require an existing `split_rules` rule, preselected from
 `household_settings.default_joint_split`. The app stores only its ID. Existing
@@ -89,9 +102,11 @@ Git and keep the private HTTPS/LAN/VPN controls in place.
 ## Validation and operator acceptance
 
 `npm run typecheck`, `npm test`, and `npm run build` validate the app. Behavioral
-tests exercise hint boundaries, invalid review/split payloads, signed rounding,
-Actual split handling, session/password/origin checks, and repository SQL against
-embedded PostgreSQL using the unchanged migrations. Actual SDK failure/retry and
+tests exercise hint boundaries, invalid owner/split payloads, signed rounding,
+Actual split handling, session/password/origin checks, repository SQL against
+embedded PostgreSQL using the unchanged migrations, and the bank-sync owner
+defaulting helpers (payer-hint parity, leaf filtering, insert-only defaults,
+idempotency and chunking). Actual SDK failure/retry and
 30-second timeout tests use a local fake server and no real budget credentials.
 These tests do not establish browser or live service acceptance.
 
@@ -103,10 +118,15 @@ still needs to check:
 - Desktop and narrow mobile layout, keyboard navigation, readable labels, loading,
   empty/error states, and retention of an unsaved draft after a failed save.
 - Real Actual payee/account/date/amount display and split child rows, with no
-  parent duplication. Confirm month navigation and historical save/confirm persistence.
-- A paying-account hint never sets the expense owner or resolves review. Save
-  differing owner/payer values, refresh, confirm review, then reopen it.
-- All four global filters and the review-only toggle; unknown owners remain in ALL.
+  parent duplication. Confirm month navigation and historical save persistence.
+- Bank-sync defaults: after a scheduled sync run, transactions on
+  Michael/Liz/Joint-prefixed accounts show that member as owner and payer with
+  no review state; accounts without a prefix stay unclassified and are flagged
+  in the sync output.
+- Inline editing: change the expense owner from the list, change the payer or
+  notes in Advanced, refresh, and confirm both persist without any confirm
+  gate. A defaulted owner can be overridden at any time.
+- All four global filters; unknown owners remain in ALL.
 - JOINT 50/50 preview, odd-cent/refund rounding, personal owner clearing the rule,
   and persistence across app restart. Verify Actual transaction data is unchanged.
 
@@ -118,7 +138,7 @@ described below.
 
 The existing authenticated `GET /api/ownership` response adds a `summary` key
 with `from` / `through` UTC dates, `owners` (MICHAEL, LIZ, JOINT, UNCLASSIFIED),
-and `topCategories` (up to eight `{ id, name, amount }` rows). Existing review
+and `topCategories` (up to eight `{ id, name, amount }` rows). Existing metadata
 fields and writes retain their contracts. The summary reuses the same Actual
 read and metadata query; no additional ledger or database writes are introduced.
 Amounts are positive integer Actual minor units representing **gross spending**:
@@ -126,16 +146,17 @@ negative leaf transactions only, excluding linked transfers (`transfer_id`).
 Income, refunds, and zero amounts are excluded rather than netted against spend.
 The range is the selected UTC calendar month, inclusive, ending today for the current month.
 
-Saved expense ownership determines the bucket regardless of review status;
-missing/null owners are Unclassified. Account names and payer tags never assign
-ownership. JOINT remains its own bucket, with no allocation to personal totals.
+Saved expense ownership determines the bucket;
+missing/null owners are Unclassified. The summary never assigns ownership from
+account names or payer tags; bank-sync defaults are ordinary saved rows by
+summary time. JOINT remains its own bucket, with no allocation to personal totals.
 Actual split children count once via `leaves()`; parents are excluded.
 Categories aggregate across all owners by Actual category ID, including hidden
 categories. Missing categories display as Uncategorized; unresolved IDs display
 as Unknown category. Ordering is descending spend, then name and ID for ties.
 
-The section below the review queue always shows the whole household, independent
-of review filters. Successful tagging updates owner cards immediately from saved
+The section below the transaction list always shows the whole household,
+independent of owner filters. Successful tagging updates owner cards immediately from saved
 rows; Refresh reloads the full summary. Currency uses household settings and the
 existing minor-unit formatter. This slice adds no charts or dependencies.
 
@@ -143,7 +164,7 @@ existing minor-unit formatter. This slice adds no charts or dependencies.
 
 `GET /api/ownership` adds `bills`, matching Actual schedules to household metadata
 by `actual_schedule_id`. Upcoming bills appears below the monthly summary and
-shows all household schedules independently of transaction review filters. Empty
+shows all household schedules independently of transaction owner filters. Empty
 schedules show “No schedules configured in Actual yet.” Unnamed schedules and
 missing dates/responsibility have explicit placeholders.
 

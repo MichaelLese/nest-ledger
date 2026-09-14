@@ -19,7 +19,11 @@ ownership, responsibility, reconciliation, and simplified visualization.
 - One shared household Actual budget; account ownership ≠ transaction ownership.
 - Track "who owns the expense" (MICHAEL / LIZ / JOINT) separately from "who paid it".
 - Use Actual categories for *what* the money was for; custom metadata for *who it belongs to / who paid*.
-- Never infer expense ownership solely from the paying bank account.
+- Never infer expense ownership solely from the paying bank account — except the
+  operator-approved bank-sync default: synced transactions save immediately with
+  the paying account's member (Michael/Liz/Joint account-name prefix) as
+  expense owner and payer, REVIEWED, and remain editable anytime from the
+  transactions list. There is no review queue or confirm gate.
 - Extend Actual Schedules for bills; never build a second recurrence engine.
 - Use Actual split transactions wherever possible so card transactions remain intact.
 - Never rebuild Actual Budget in the custom app; never store a second financial ledger.

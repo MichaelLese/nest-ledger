@@ -2,10 +2,10 @@
 
 This is the initial infrastructure skeleton, based on sections 3, 12–14 of
 [the build plan](doc_bd8b06650f63_family_finance_dashboard_proxmox_build_plan.pdf).
-Actual remains the ledger. The single Next.js web/API service serves the ownership review
+Actual remains the ledger. The single Next.js web/API service serves the ownership
 page, `/api/health`, and a read-only `/api/actual/summary` endpoint. See
 [Actual integration](actual-integration.md) for credentials, API smoke testing,
-and the household metadata SQL migration. Phase 4 adds [ownership review and member login](ownership.md); its new auth
+and the household metadata SQL migration. Phase 4 adds [ownership and member login](ownership.md); its new auth
 environment variables must be supplied before deployment. The health endpoint checks process liveness only.
 
 The live CT 116 deployment, private HTTPS URLs, backup automation and restore
