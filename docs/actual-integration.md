@@ -144,7 +144,7 @@ worker calls `getTransactions(account.id, ACTUAL_START_DATE, ACTUAL_END_DATE)`.
 No new SDK calls or endpoints are added. Credentials, the 30-second child
 termination, sanitized 503 responses, and no-store headers are unchanged.
 
-Historical review cards use the same transaction editor and save/confirm flow as
+Historical months use the same transaction editor and direct-save flow as
 current-month cards. Saves send the displayed month to PUT, which validates the
 transaction ID against Actual leaf transactions within that inclusive range;
 missing or out-of-month IDs return 409 without writing metadata. PUT without a
@@ -166,3 +166,19 @@ SimpleFIN connection stays visible in the schedule. This is operational
 tooling: the web app's own endpoints remain read-only and Actual stays the only
 ledger. agent-hub owns the schedule and the agent-hub wrapper; see
 [deployment](deployment.md).
+
+After uploading, the same run saves the operator-approved household default
+inside the container: every leaf transaction whose account name begins with
+Michael/Liz/Joint — the same prefix convention as the app's payer hint —
+saves immediately as `transaction_metadata` with expense owner and payer set to
+that member, status REVIEWED, and the household default joint split for JOINT
+owners. Existing metadata rows are never overwritten (`ON CONFLICT DO NOTHING`),
+so manual edits win and repeated runs are idempotent. The scan covers the whole
+downloaded budget, so the first run backfills SimpleFIN's own lookback and
+pre-feature history. Transactions on accounts without a member prefix stay
+unclassified until edited in the transactions list; the per-account summary
+line marks those accounts. Defaulting needs the container's PostgreSQL
+environment: without PGHOST/PGDATABASE it prints one skip line and leaves the
+exit code unchanged, while a configured database that fails to accept defaults
+makes the run exit 1 so the schedule surfaces it. Only counts are printed,
+never amounts, payees or credentials.

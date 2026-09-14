@@ -30,7 +30,7 @@ export function parseMetadata(value: unknown, rules: SplitRule[]): Metadata {
     || !member(v.expense_owner) || !member(v.payer)
     || !['NEEDS_REVIEW', 'REVIEWED'].includes(v.review_status as string)
     || !(v.notes === null || typeof v.notes === 'string' && v.notes.length <= 2000)) throw new Error('Invalid metadata.');
-  if (v.review_status === 'REVIEWED' && (!v.expense_owner || !v.payer)) throw new Error('Choose an expense owner and payer before confirming review.');
+  if (v.review_status === 'REVIEWED' && !v.expense_owner) throw new Error('Choose an expense owner before saving.');
   if (v.expense_owner === 'JOINT') {
     if (!rules.some(rule => rule.id === v.split_rule)) throw new Error('Choose a joint split rule.');
   } else if (v.split_rule !== null) throw new Error('Only joint expenses can have a split rule.');

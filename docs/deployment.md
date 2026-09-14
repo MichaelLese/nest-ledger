@@ -156,9 +156,16 @@ counts and latest transaction dates for the last 14 days, and never prints
 credentials, payees or amounts. The server's `/simplefin/*` HTTP routes only
 fetch and normalize bridge data; the budget import happens in Actual's own
 core inside `runBankSync()`, with Actual's own lookback (89 days or the
-account's oldest transaction). A failing account — for example a SimpleFIN
-connection needing attention — still uploads the healthy accounts, prints the
-summary and exits 1 so the failure stays visible.
+account's oldest transaction). After uploading, the run also saves the
+operator-approved household default — expense owner and payer set to the
+paying account's member for every leaf transaction on a Michael/Liz/Joint
+prefixed account, REVIEWED, insert-only so existing household metadata is
+never overwritten; accounts without a member prefix stay unclassified and are
+flagged with `no household member prefix` in the per-account line. A failing
+account — for example a SimpleFIN connection needing attention — still uploads
+the healthy accounts, prints the summary and exits 1 so the failure stays
+visible; a configured metadata database that rejects the defaults also exits 1,
+while a missing PostgreSQL environment only skips defaulting.
 
 Agent-hub runs [infrastructure/bank-sync-agent-hub.sh](../infrastructure/bank-sync-agent-hub.sh)
 as `agent`, installed at `/home/agent/.local/bin/nest-ledger-bank-sync` (mode
