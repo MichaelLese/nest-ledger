@@ -42,9 +42,10 @@ hints. Saving requires an expense owner only; a payer can stay unset for
 accounts without a hint and be added later. JOINT saves require an existing
 `split_rules` rule, preselected from `household_settings.default_joint_split`.
 Either spouse can edit all household rows; simultaneous saves use
-last-write-wins. The ALL | MICHAEL | LIZ | JOINT filter uses saved expense
-ownership, so unowned rows appear only under ALL. Refresh reloads the view
-and discards unsaved edits.
+last-write-wins. Independent MICHAEL / LIZ / JOINT toggles combine saved expense
+owners. No selection means All household, including unowned rows; selecting all
+three members excludes unowned rows. Refresh reloads data and discards unsaved
+edits, while retaining in-memory visualization controls. A full reload resets them.
 
 JOINT expenses require an existing `split_rules` rule, preselected from
 `household_settings.default_joint_split`. The app stores only its ID. Existing
@@ -130,7 +131,8 @@ still needs to check:
 - Inline editing: change the expense owner from the list, change the payer or
   notes in Advanced, refresh, and confirm both persist without any confirm
   gate. A defaulted owner can be overridden at any time.
-- All four global filters; unknown owners remain in ALL.
+- Every ownership combination and last-toggle removal; unclassified expenses
+  appear only in the All household state (no selected members).
 - JOINT 50/50 preview, odd-cent/refund rounding, personal owner clearing the rule,
   and persistence across app restart. Verify Actual transaction data is unchanged.
 
@@ -159,16 +161,20 @@ Categories aggregate across all owners by Actual category ID, including hidden
 categories. Missing categories display as Uncategorized; unresolved IDs display
 as Unknown category. Ordering is descending spend, then name and ID for ties.
 
-The monthly summary above the transaction list keeps whole-household owner totals,
-independent of transaction owner filters. Clicking MICHAEL, LIZ, JOINT or
-Unclassified filters Top categories to that saved expense owner; clicking the
-active card again or the global ALL button restores overall categories. The
-selected card and category badge identify the active view. Successful tagging
-updates owner cards and selected categories immediately from saved rows. The
-existing response includes each transaction's category ID so the client can
-aggregate by ID, including categories outside the overall top eight. Refresh,
-in the header immediately before Sign out, reloads the full summary. Currency uses household settings and the
-existing minor-unit formatter. This slice adds no charts or dependencies.
+The category visualization uses a shared multi-select expense ownership scope for
+its total, donut, ranked list, category detail and monthly transactions. MICHAEL,
+LIZ (Elizabeth) and JOINT can be combined; no selected members means All household,
+including Unclassified. Selecting all three excludes Unclassified. Successful
+metadata saves recalculate spending from the current saved transaction rows.
+
+Donut is the default view with exactly the top eight nonzero categories (or all
+available when fewer than eight). The ranked list is an equally usable alternative.
+All nonzero categories is in-memory session state, never a stored preference.
+Selecting a slice rotates it to the bottom; its center shows category spending and
+its share of the full active scope. Activate the center, or a ranked-list row, for
+six-month history and the contributing transactions matched by Actual category ID.
+See [Category spending](category-spending.md) for the complete behavior, history
+endpoint, PWA state rules and validation/acceptance guidance.
 
 ## Phase 5 bills surface
 
