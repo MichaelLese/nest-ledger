@@ -9,4 +9,3 @@ export function monthRange(month: string | null, today = new Date().toISOString(
   end.setUTCDate(0);
   return { from: selected + '-01', through: selected === today.slice(0, 7) ? today : end.toISOString().slice(0, 10) };
 }
-
