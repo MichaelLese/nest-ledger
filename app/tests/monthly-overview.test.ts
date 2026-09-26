@@ -2,50 +2,60 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MonthlyOverview } from '../src/app/ownership-app';
+import { CategorySpending, OwnershipScopePicker } from '../src/app/category-spending';
+import { donutPath, donutSlices } from '../src/app/category-chart';
 
-type Props = ComponentProps<typeof MonthlyOverview>;
-const row = (id: string, owner: Props['data']['transactions'][number]['metadata']['expense_owner'], amount: number, category = id) => ({
+type Props = ComponentProps<typeof CategorySpending>;
+const row = (id: string, owner: Props['data']['transactions'][number]['metadata']['expense_owner'], amount: number, category: string | null = id) => ({
   id, date: '2026-09-01', amount, category, categoryName: 'Food', description: id,
   account: 'Michael Checking', parentId: null, payerHint: 'MICHAEL' as const,
   metadata: { actual_transaction_id: id, expense_owner: owner, payer: 'MICHAEL' as const, split_rule: null, notes: null, review_status: 'REVIEWED' as const },
 });
 const data: Props['data'] = {
   bills: [], rules: [], defaultSplit: null, currency: 'USD',
-  summary: { from: '2026-09-01', through: '2026-09-14', owners: { MICHAEL: 0, LIZ: 0, JOINT: 0, UNCLASSIFIED: 0 }, topCategories: [{ id: 'overall', name: 'Overall category', amount: 9999 }] },
+  summary: { from: '2026-09-01', through: '2026-09-14', owners: { MICHAEL: 0, LIZ: 0, JOINT: 0, UNCLASSIFIED: 0 }, topCategories: [{ id: 'stale', name: 'Stale', amount: 9999 }] },
   transactions: [row('m', 'MICHAEL', -101), row('l', 'LIZ', -202), row('j', 'JOINT', -303), row('u', null, -404), row('refund', 'LIZ', 1000), { ...row('transfer', 'LIZ', -1000), transfer_id: 'other' }],
 };
-const render = (categoryOwner: Props['categoryOwner'], value = data) => renderToStaticMarkup(createElement(MonthlyOverview, { data: value, categoryOwner, onSelect: () => {} }));
-const categories = (html: string) => html.slice(html.indexOf('Top categories'));
-test('member categories use saved owners, exclude refunds/transfers and show selection', () => {
-  for (const [owner, label, amount] of [['MICHAEL', 'MICHAEL', '1.01'], ['LIZ', 'LIZ', '2.02'], ['JOINT', 'JOINT', '3.03'], ['UNCLASSIFIED', 'Unclassified', '4.04']] as const) {
-    const html = render(owner);
-    assert.match(categories(html), new RegExp(label + ' · up to 8'));
-    assert.ok(categories(html).includes('$' + amount));
-    assert.equal((html.match(/aria-pressed="true"/g) ?? []).length, 1);
-    assert.ok(!categories(html).includes('Overall category'));
-  }
-  const overall = render('ALL');
-  assert.match(categories(overall), /Overall · up to 8/);
-  assert.match(categories(overall), /Overall category/);
-  assert.ok(!overall.includes('aria-pressed="true"'));
+const render = (props: Partial<Props> = {}) => renderToStaticMarkup(createElement(CategorySpending, { data, scope: [], showAll: false, onShowAll: () => {}, view: 'donut', onView: () => {}, detail: null, onDetail: () => {}, ...props }));
+test('scoped view and center use saved owners and full scope denominator', () => {
+  const html = render({ scope: ['MICHAEL', 'JOINT'] });
+  assert.match(html, /MICHAEL \+ JOINT/);
+  assert.match(html, /Spent this month<\/span><strong>\$4.04/);
+  assert.match(html, /Open Food details, \$3.03, 75% of active scope/);
+  assert.doesNotMatch(html, /Stale|\$10.00/);
+  assert.match(html, /role="status">Selected Food/);
 });
-test('selected categories update after saved ownership changes and preserve separate category IDs', () => {
-  const changed = { ...data, transactions: [row('a', 'LIZ', -100), row('b', 'LIZ', -200)] };
-  assert.equal((categories(render('LIZ', changed)).match(/<li>/g) ?? []).length, 2);
-  assert.match(categories(render('MICHAEL', changed)), /No spending this month/);
-  changed.transactions[0] = row('a', 'MICHAEL', -100);
-  assert.match(categories(render('MICHAEL', changed)), /\$1\.00/);
-  assert.ok(!categories(render('LIZ', changed)).includes('$1.00'));
+test('Top 8 is exact and all nonzero categories is independently available', () => {
+  const many = { ...data, transactions: Array.from({ length: 10 }, (_, i) => row(String(i), 'LIZ', -(i + 1) * 100)) };
+  const top = render({ data: many });
+  assert.equal((top.match(/class="category-row"/g) ?? []).length, 8);
+  assert.match(top, /Top 8 of 10 categories · \$3.00 outside Top 8/);
+  assert.match(top, /\$10.00, 18.2% of active scope/);
+  assert.equal((render({ data: many, showAll: true }).match(/class="category-row"/g) ?? []).length, 10);
 });
-test('clicking a member selects it and clicking the active member restores overall', () => {
-  for (const active of ['ALL', 'MICHAEL', 'LIZ', 'JOINT', 'UNCLASSIFIED'] as const) {
-    let selected: Props['categoryOwner'] = active;
-    const view = MonthlyOverview({ data, categoryOwner: active, onSelect: owner => { selected = owner; } });
-    const cards = view.props.children.find((child: { props?: { className?: string } }) => child?.props?.className === 'summary-cards');
-    for (const card of cards.props.children) {
-      card.props.onClick();
-      assert.equal(selected, card.key === active ? 'ALL' : card.key);
-    }
-  }
+test('ranked list has category detail buttons, no donut dependency or primary row transaction counts', () => {
+  const html = render({ view: 'list', scope: ['LIZ'] });
+  assert.doesNotMatch(html, /<svg|transactions/);
+  assert.match(html, /aria-label="Open Food details, \$2.02, 100% of active scope"/);
+  assert.match(render({ scope: ['LIZ'], data: { ...data, transactions: [] } }), /No spending this month for liz/);
+});
+test('detail includes only gross spending for the exact category ID and owner combination', () => {
+  const html = render({ scope: ['MICHAEL', 'JOINT'], detail: { id: 'j', name: 'Food' } });
+  assert.match(html, /Six-month history/);
+  assert.match(html, /1 transaction/);
+  assert.match(html, /<strong>j<\/strong>/);
+  assert.doesNotMatch(html, /<strong>m<\/strong>|<strong>l<\/strong>|<strong>refund<\/strong>/);
+});
+test('selection controls expose each member toggle and clear all-household state', () => {
+  const html = renderToStaticMarkup(createElement(OwnershipScopePicker, { scope: ['MICHAEL', 'LIZ'], onChange: () => {} }));
+  assert.equal((html.match(/aria-pressed="true"/g) ?? []).length, 2);
+  assert.match(html, /aria-pressed="false">All household/);
+  assert.match(renderToStaticMarkup(createElement(OwnershipScopePicker, { scope: [], onChange: () => {} })), /includes unclassified expenses/);
+});
+test('slice geometry preserves full-scope percentages and selected midpoint rotates to bottom', () => {
+  const slices = donutSlices([{ id: 'a', name: 'A', amount: 20 }, { id: 'b', name: 'B', amount: 30 }], 100);
+  assert.deepEqual(slices.map(row => [row.start, row.sweep]), [[0, 72], [72, 108]]);
+  for (const slice of slices) assert.equal(slice.middle + (180 - slice.middle), 180);
+  assert.equal((donutPath(0, 360).match(/A /g) ?? []).length, 4);
+  assert.doesNotMatch(donutPath(0, 360), /NaN|Infinity/);
 });

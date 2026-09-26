@@ -225,3 +225,20 @@ UPDATE count; an immediate rerun reports UPDATE 0. Future NEEDS_REVIEW rows woul
 also qualify on a later rerun, so inspect candidates each time. No app rebuild or
 restart is needed; refresh the transaction list. Application startup and bank
 sync do not run this migration automatically.
+
+## Category history reads
+
+`GET /api/ownership/category-history?month=YYYY-MM&category=<Actual category ID>`
+adds an authenticated, no-store visualization read. Repeated `owner=MICHAEL`,
+`owner=LIZ`, `owner=JOINT` parameters combine saved expense owners; omission means
+all household. An empty category value identifies Uncategorized. The endpoint
+loads the selected month and five preceding months with one bounded Actual summary
+read and a household metadata SELECT. It returns six monthly amount bars, including
+zero-spend months; no historical transactions or ledger snapshots are persisted.
+The same gross-spend, leaf, transfer, refund and category-ID rules apply as for the
+monthly summary. See [Category spending](category-spending.md).
+
+This needs no migration, bank sync, Actual financial write, or deployment change.
+The existing temporary-download cleanup, coalescing and 30-second SDK deadline
+apply; the larger read can exceed that deadline on a large budget. The UI exposes
+a retry and retains the selected month's transaction detail if history fails.

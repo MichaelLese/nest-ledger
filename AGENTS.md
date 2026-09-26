@@ -27,7 +27,11 @@ ownership, responsibility, reconciliation, and simplified visualization.
 - Extend Actual Schedules for bills; never build a second recurrence engine.
 - Use Actual split transactions wherever possible so card transactions remain intact.
 - Never rebuild Actual Budget in the custom app; never store a second financial ledger.
-- Global UI filter is always: **ALL | MICHAEL | LIZ | JOINT**.
+- Expense ownership scope uses independent **MICHAEL | LIZ (Elizabeth) | JOINT** toggles.
+  Combine members; tap a selected member to remove it. No selection means **All household**,
+  including unclassified expenses. All three selected excludes unclassified expenses.
+  Scope spending totals, categories, history, and transactions by saved expense ownership,
+  never payer or account ownership. See `docs/category-spending.md` for the visualization contract.
 - One straightforward stack (Next.js + TypeScript + Tailwind frontend, Node + TypeScript backend,
   @actual-app/api, PostgreSQL, Docker Compose). Avoid microservices.
 
