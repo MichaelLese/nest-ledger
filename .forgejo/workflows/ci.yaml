@@ -1,0 +1,32 @@
+name: Project
+on:
+  push:
+    branches: [main, 'rotom/**', 'codex/**', 'fix/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    name: Checks
+    runs-on: household-build
+    timeout-minutes: 10
+    steps:
+      - name: Fetch the exact source commit
+        env:
+          FORGEJO_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import io,os,tarfile,urllib.request
+          base='https://forgejo-iac.tailcc818c.ts.net/api/v1/repos/household/nest-ledger'
+          req=urllib.request.Request(base+'/archive/'+os.environ['COMMIT']+'.tar.gz',headers={'Authorization':'token '+os.environ['FORGEJO_TOKEN']})
+          with urllib.request.urlopen(req,timeout=90) as response: payload=response.read()
+          with tarfile.open(fileobj=io.BytesIO(payload)) as archive: archive.extractall('source',filter='data')
+          PY
+      - name: Validate in the isolated project worker
+        run: |
+          set -eu
+          cd source/*
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build

@@ -39,3 +39,7 @@ ownership, responsibility, reconciliation, and simplified visualization.
 - CUSTOM APP MUST ANSWER: Who owns it? Who paid it? Is it joint? How should it be split?
   Who is responsible for the bill? Are we balanced? What is due next?
 - No secrets in Git; PostgreSQL not externally reachable; HTTPS-only; Tailscale/WireGuard remote access.
+
+## Primary Git host
+
+Michael authorized the Forgejo migration and checked agent merges without routine human review. Read FORGEJO.md. Use this project in Forgejo as origin; preserve upstream/publication remotes separately. This migration does not change runtime credentials, accounts, data or deployment targets.
