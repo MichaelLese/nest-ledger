@@ -18,10 +18,15 @@ jobs:
         run: |
           python3 - <<'PY'
           import io,os,tarfile,urllib.request
+          from pathlib import Path
           base='https://forgejo-iac.tailcc818c.ts.net/api/v1/repos/household/nest-ledger'
           req=urllib.request.Request(base+'/archive/'+os.environ['COMMIT']+'.tar.gz',headers={'Authorization':'token '+os.environ['FORGEJO_TOKEN']})
           with urllib.request.urlopen(req,timeout=90) as response: payload=response.read()
-          with tarfile.open(fileobj=io.BytesIO(payload)) as archive: archive.extractall('source',filter='data')
+          root=Path('source').resolve();root.mkdir(exist_ok=True)
+          with tarfile.open(fileobj=io.BytesIO(payload)) as archive:
+              for member in archive:
+                  if not (root/member.name).resolve().is_relative_to(root):raise ValueError('Unsafe archive path')
+                  if member.isfile() or member.isdir():archive.extract(member,root)
           PY
       - name: Validate in the isolated project worker
         run: |
